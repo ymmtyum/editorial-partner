@@ -61,21 +61,6 @@ chapters.forEach((chapter, index) => {
   button.querySelector('.tile-heading').textContent = title;
   button.setAttribute('aria-label', `${String(index + 1).padStart(2, '0')} ${title}へ移動`);
   tileGrid.append(button);
-
-  if (index >= 2) {
-    const meta = chapter.querySelector('.card-meta');
-    const label = meta.lastElementChild;
-    const actions = document.createElement('span');
-    actions.className = 'card-meta-actions';
-    const alignButton = document.createElement('button');
-    alignButton.type = 'button';
-    alignButton.className = 'align-stack';
-    alignButton.textContent = 'トントンする';
-    alignButton.setAttribute('aria-label', '積み重なったカードを揃える');
-    actions.append(label, alignButton);
-    meta.append(actions);
-    alignButton.addEventListener('click', alignStack);
-  }
 });
 
 function bundleDistance() {
@@ -162,6 +147,7 @@ function cancelTransition() {
   clearTimeout(transitionTimer);
   runningAnimations.forEach((animation) => animation.cancel());
   runningAnimations = [];
+  cardStack.classList.remove('is-morph-source');
   transitionVersion += 1;
   transitioning = false;
 }
@@ -197,7 +183,7 @@ function rubber(value, min, max) {
 
 function dragLimits() {
   const onTop = view === 'top' || (view === 'transition' && activeIndex < 0);
-  if (onTop && !stashSide) return { minX: 0, maxX: 0, minY: -Infinity, maxY: 0 };
+  if (onTop && !stashSide && activeIndex < 0) return { minX: 0, maxX: 0, minY: -Infinity, maxY: 0 };
   if (onTop && stashSide) {
     const base = stashSide * bundleDistance();
     return stashSide > 0
@@ -301,7 +287,7 @@ function captureLivePose() {
     cancelTransition();
     chapters.forEach((_, index) => cardFor(index)?.style.removeProperty('transform'));
     cardStack.style.removeProperty('transform');
-  } else if (view === 'top' && stashSide) {
+  } else if (view === 'top' && stashSide && Math.abs(pose.x) < 1) {
     pose.x = stashSide * bundleDistance();
     pose.y = 0;
     cardStack.style.removeProperty('transform');
@@ -378,7 +364,7 @@ function releasePose(velocity = poseVelocity()) {
     if (view === 'top' && stashSide && xDelta * stashSide < 0) {
       targetX = 0;
       action = 'restore';
-    } else if (view === 'card') {
+    } else if (view === 'card' || (activeIndex >= 0 && !stashSide)) {
       targetX = Math.sign(xDelta || velocity.x) * bundleDistance();
       action = 'stash';
     }
@@ -494,6 +480,12 @@ function commitStash(side) {
 function commitRestore() {
   stashSide = 0;
   pose = { x: 0, y: 0 };
+  if (shownNext >= 0) {
+    clearCardDrag(shownNext);
+    hideChapter(shownNext);
+    shownNext = -1;
+  }
+  renderStack(activeIndex);
   cardStack.style.removeProperty('--bundle-x');
   cardStack.style.removeProperty('--bundle-rot');
   cardStack.style.removeProperty('transform');
@@ -735,7 +727,7 @@ function scrollCurrentCard(delta) {
 }
 
 function alignStack() {
-  if (view !== 'card' || activeIndex < 2 || transitioning) return;
+  if (view !== 'card' || activeIndex < 1 || transitioning) return;
   cardStack.classList.add('is-aligned');
   if (reduceMotion.matches) return;
   const version = ++transitionVersion;
@@ -760,6 +752,66 @@ function alignStack() {
     runningAnimations = [];
     transitioning = false;
   });
+}
+
+let knockAt = 0;
+let tileOpenTimer = 0;
+
+function nudgeStack() {
+  if (view !== 'card' || activeIndex < 0 || reduceMotion.matches) return;
+  const aligned = cardStack.classList.contains('is-aligned');
+  chapters.slice(0, activeIndex + 1).forEach((_, index) => {
+    const card = cardFor(index);
+    const look = lookFor(index);
+    const rest = aligned ? 'translate(0px, 0px) rotate(0deg)' : `translate(${look.x}px, ${look.y}px) rotate(${look.angle}deg)`;
+    const shaken = aligned
+      ? 'translate(4px, -2px) rotate(.7deg)'
+      : `translate(${look.x + 5}px, ${look.y - 2}px) rotate(${look.angle + .8}deg)`;
+    card.animate([
+      { transform: rest },
+      { transform: shaken, offset: .42 },
+      { transform: rest },
+    ], { duration: 240, delay: (activeIndex - index) * 16, easing: 'ease-in-out' });
+  });
+}
+
+function nudgeTiles() {
+  if (reduceMotion.matches) return;
+  [...tileGrid.children].forEach((button, index) => {
+    const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
+    button.animate([
+      { transform: `rotate(${angle})` },
+      { transform: 'rotate(1.6deg)', offset: .45 },
+      { transform: `rotate(${angle})` },
+    ], { duration: 200, delay: index * 10, easing: 'ease-in-out' });
+  });
+}
+
+function alignTiles() {
+  [...tileGrid.children].forEach((button, index) => {
+    const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
+    button.style.setProperty('--tile-angle', '0deg');
+    if (reduceMotion.matches) return;
+    button.animate([
+      { transform: `rotate(${angle})` },
+      { transform: 'rotate(-.8deg)', offset: .4 },
+      { transform: 'rotate(0deg)' },
+    ], { duration: 260, delay: index * 12, easing: 'ease-in-out' });
+  });
+}
+
+function registerKnock() {
+  const now = performance.now();
+  if (now - knockAt < 420) {
+    knockAt = 0;
+    if (view === 'tiles') alignTiles();
+    else alignStack();
+    return true;
+  }
+  knockAt = now;
+  if (view === 'tiles') nudgeTiles();
+  else nudgeStack();
+  return false;
 }
 
 function randomTileAngles() {
@@ -789,6 +841,7 @@ function openTiles() {
   resetWheel(false);
   randomTileAngles();
   const sourceBounds = chapters.map((_, index) => index <= activeIndex ? cardMorphBounds(index) : null);
+  cardStack.classList.add('is-morph-source');
   tileView.hidden = false;
   tileView.classList.add('is-active');
   tileView.setAttribute('aria-hidden', 'false');
@@ -798,7 +851,11 @@ function openTiles() {
   buttons.forEach((button, index) => {
     button.getAnimations().forEach((animation) => animation.cancel());
     const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
-    if (index > activeIndex || reduceMotion.matches) return;
+    if (reduceMotion.matches) return;
+    if (index > activeIndex) {
+      animations.push(button.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, delay: 90, easing: 'ease-out', fill: 'both' }));
+      return;
+    }
     const source = sourceBounds[index];
     const target = button.getBoundingClientRect();
     const dx = source.left + source.width / 2 - (target.left + target.width / 2);
@@ -815,6 +872,7 @@ function openTiles() {
     if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
     runningAnimations = [];
+    cardStack.classList.remove('is-morph-source');
     transitioning = false;
     tileGrid.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
   });
@@ -827,6 +885,7 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   const buttons = [...tileGrid.children];
   const tileBounds = buttons.map((button) => button.getBoundingClientRect());
   jumpToCard(targetIndex);
+  cardStack.classList.add('is-morph-source');
   const animations = [];
   if (!reduceMotion.matches) {
     buttons.forEach((button, index) => {
@@ -852,6 +911,7 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
     if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
     runningAnimations = [];
+    cardStack.classList.remove('is-morph-source');
     tileView.classList.remove('is-active');
     tileView.hidden = true;
     tileView.setAttribute('aria-hidden', 'true');
@@ -867,9 +927,18 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
 tileToggle.addEventListener('click', openTiles);
 tileClose.addEventListener('click', () => closeTiles());
 tileGrid.addEventListener('click', (event) => {
+  if (performance.now() < suppressClickUntil) return;
   const button = event.target.closest('.tile-card');
+  if (registerKnock()) {
+    clearTimeout(tileOpenTimer);
+    return;
+  }
   if (!button) return;
-  closeTiles(Number(button.dataset.index), { focus: false });
+  const index = Number(button.dataset.index);
+  clearTimeout(tileOpenTimer);
+  tileOpenTimer = setTimeout(() => {
+    if (view === 'tiles') closeTiles(index, { focus: false });
+  }, 340);
 });
 
 const faqItems = [...document.querySelectorAll('.faq-item')];
@@ -964,17 +1033,14 @@ window.addEventListener('wheel', (event) => {
   }
   if (!gesture.axis) {
     if (Math.hypot(gesture.sumX, gesture.sumY) < 8) return;
-    gesture.axis = Math.abs(gesture.sumY) >= Math.abs(gesture.sumX) ? 'y' : 'x';
+    gesture.axis = Math.abs(gesture.sumY) > Math.abs(gesture.sumX) * 1.35 ? 'y' : 'x';
   }
   const limits = dragLimits();
-  if (!gesture.lockedApplied) {
-    gesture.lockedApplied = true;
-    pose.x = rubber(pose.x - (gesture.axis === 'y' ? 0 : gesture.sumX), limits.minX, limits.maxX);
-    pose.y = rubber(pose.y - gesture.sumY, limits.minY, limits.maxY);
-  } else {
-    pose.x = rubber(pose.x - (gesture.axis === 'y' ? 0 : dx), limits.minX, limits.maxX);
-    pose.y = rubber(pose.y - dy, limits.minY, limits.maxY);
-  }
+  const stepX = gesture.axis === 'y' ? 0 : (gesture.lockedApplied ? dx : gesture.sumX);
+  const stepY = gesture.axis === 'x' ? 0 : (gesture.lockedApplied ? dy : gesture.sumY);
+  gesture.lockedApplied = true;
+  pose.x = rubber(pose.x - stepX, limits.minX, limits.maxX);
+  pose.y = rubber(pose.y - stepY, limits.minY, limits.maxY);
   gesture.moved = true;
   tracking = true;
   notePose();
@@ -1012,7 +1078,7 @@ function moveDrag(gesture, x, y) {
     }
   }
   if (!gesture.mode && Math.hypot(rawX, rawY) > 6) {
-    const vertical = Math.abs(rawY) >= Math.abs(rawX);
+    const vertical = Math.abs(rawY) > Math.abs(rawX) * 1.35;
     gesture.axis = vertical ? 'y' : 'x';
     const readDirection = rawY < 0 ? 1 : -1;
     gesture.mode = view === 'card' && vertical && canReadFurther(readDirection) ? 'read' : 'drag';
@@ -1034,8 +1100,9 @@ function moveDrag(gesture, x, y) {
   if (gesture.mode !== 'drag') return;
   const limits = dragLimits();
   const dragX = gesture.axis === 'y' ? 0 : x - gesture.originX;
+  const dragY = gesture.axis === 'x' ? 0 : y - gesture.originY;
   pose.x = rubber(gesture.baseX + dragX, limits.minX, limits.maxX);
-  pose.y = rubber(gesture.baseY + (y - gesture.originY), limits.minY, limits.maxY);
+  pose.y = rubber(gesture.baseY + dragY, limits.minY, limits.maxY);
   tracking = true;
   notePose();
   applyPose();
@@ -1110,6 +1177,11 @@ deck.addEventListener('click', (event) => {
     event.stopImmediatePropagation();
   }
 }, true);
+deck.addEventListener('click', (event) => {
+  if (performance.now() < suppressClickUntil || view !== 'card' || menu.open) return;
+  if (event.target.closest('a, button, summary, input, textarea, select')) return;
+  registerKnock();
+});
 
 window.addEventListener('keydown', (event) => {
   if (menu.open || event.altKey || event.ctrlKey || event.metaKey ||
