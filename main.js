@@ -227,30 +227,39 @@ function poseVelocity() {
 }
 
 function risingCard() {
-  return chapters[0].querySelector('.story-card') || deck.querySelector(':scope > .story-card');
+  return chapters[0].querySelector('.story-card') || deck.querySelector('.rising-slot .story-card');
 }
 
 function placeRisingCard(y) {
   const card = risingCard();
   if (!card) return;
   const look = lookFor(0);
-  card.style.setProperty('--stack-x', `${look.x}px`);
-  card.style.setProperty('--stack-y', `${look.y}px`);
-  card.style.setProperty('--stack-angle', `${look.angle}deg`);
-  if (card.parentElement !== deck) deck.append(card);
+  card.style.setProperty('--rest-x', `${look.x}px`);
+  card.style.setProperty('--rest-y', `${look.y}px`);
+  card.style.setProperty('--rest-angle', `${look.angle}deg`);
+  let slot = deck.querySelector(':scope > .rising-slot');
+  if (!slot) {
+    slot = document.createElement('div');
+    slot.className = 'rising-slot';
+    deck.append(slot);
+  }
+  if (card.parentElement !== slot) slot.append(card);
   card.classList.add('is-rising');
   card.style.setProperty('--drag-y', `${cardTravel() + y}px`);
 }
 
 function clearRisingCard() {
-  const card = deck.querySelector(':scope > .story-card');
-  if (!card) return;
-  card.classList.remove('is-rising');
-  card.style.removeProperty('--drag-y');
-  card.style.removeProperty('--stack-x');
-  card.style.removeProperty('--stack-y');
-  card.style.removeProperty('--stack-angle');
-  chapters[0].append(card);
+  const slot = deck.querySelector(':scope > .rising-slot');
+  const card = slot?.querySelector('.story-card');
+  if (card) {
+    card.classList.remove('is-rising');
+    card.style.removeProperty('--drag-y');
+    card.style.removeProperty('--rest-x');
+    card.style.removeProperty('--rest-y');
+    card.style.removeProperty('--rest-angle');
+    chapters[0].append(card);
+  }
+  slot?.remove();
 }
 
 function clearCardDrag(index) {
@@ -448,16 +457,19 @@ function finishPose(action, targetX) {
 }
 
 function commitEnteredCard() {
-  clearRisingCard();
-  clearCardDrag(0);
-  shownNext = -1;
   pose = { x: 0, y: 0 };
+  cardStack.style.visibility = 'hidden';
   cardStack.style.removeProperty('--bundle-x');
   cardStack.style.removeProperty('--bundle-rot');
+  cardStack.style.removeProperty('transform');
   cardStack.classList.remove('is-held');
+  chapters.forEach((chapter) => chapter.classList.remove('is-neat'));
+  clearRisingCard();
+  cardStack.style.visibility = '';
+  clearCardDrag(0);
+  shownNext = -1;
   activeIndex = 0;
   stashSide = 0;
-  chapters.forEach((chapter) => chapter.classList.remove('is-neat'));
   renderStack(0);
   hero.style.opacity = '0';
   setHash(chapters[0].id);
