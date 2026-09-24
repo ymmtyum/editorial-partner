@@ -31,8 +31,9 @@ jobs:
 
       - name: Prepare public files
         run: |
-          mkdir _site
-          cp index.html styles.css main.js favicon.svg profile-placeholder.svg _site/
+          mkdir -p _site/images
+          cp index.html styles.css main.js favicon.svg profile.svg og.png _site/
+          cp images/* _site/images/
 
       - name: Upload website
         uses: actions/upload-pages-artifact@v4

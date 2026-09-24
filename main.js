@@ -36,8 +36,12 @@ let touchGesture = null;
 let pointerGesture = null;
 let suppressClickUntil = 0;
 
+function lookFor(index) {
+  return stackLooks[index % stackLooks.length];
+}
+
 chapters.forEach((chapter, index) => {
-  const look = stackLooks[index];
+  const look = lookFor(index);
   chapter.style.setProperty('--stack-level', String(index + 1));
   chapter.style.setProperty('--stack-x', `${look.x}px`);
   chapter.style.setProperty('--stack-y', `${look.y}px`);
@@ -90,7 +94,7 @@ function cardScrollFor(index) {
 }
 
 function stackTransform(index, extraY = 0) {
-  const look = stackLooks[index];
+  const look = lookFor(index);
   return `translate(${look.x}px, ${look.y + extraY}px) rotate(${look.angle}deg)`;
 }
 
@@ -100,12 +104,12 @@ function restingTransform(index, extraY = 0) {
 }
 
 function restingAngle(index) {
-  return cardStack.classList.contains('is-aligned') ? 0 : stackLooks[index].angle;
+  return cardStack.classList.contains('is-aligned') ? 0 : lookFor(index).angle;
 }
 
 function setHash(id) {
   const hash = `#${id}`;
-  if (location.hash !== hash) history.replaceState(null, '', hash);
+  if (location.hash !== hash) history.pushState(null, '', hash);
 }
 
 function updateCurrentLinks() {
@@ -500,10 +504,12 @@ function scrollCurrentCard(delta) {
 
 function alignStack() {
   if (view !== 'card' || activeIndex < 2 || transitioning) return;
+  cardStack.classList.add('is-aligned');
+  if (reduceMotion.matches) return;
+  const version = ++transitionVersion;
+  transitioning = true;
   const cards = chapters.slice(0, activeIndex + 1).map((_, index) => cardFor(index));
   const starts = cards.map((card) => getComputedStyle(card).transform);
-  cardStack.classList.add('is-aligned');
-  transitioning = true;
   const animations = cards.map((card, index) => card.animate([
     { transform: starts[index] },
     { transform: 'translate(-3px, 1px) rotate(-.18deg)', offset: .45 },
@@ -515,15 +521,18 @@ function alignStack() {
     easing: 'ease-in-out',
     fill: 'both',
   }));
+  runningAnimations = animations;
   Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+    if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
+    runningAnimations = [];
     transitioning = false;
   });
 }
 
 function randomTileAngles() {
   [...tileGrid.children].forEach((button) => {
-    const angle = (Math.random() * 4.2 - 2.1).toFixed(2);
+    const angle = reduceMotion.matches ? '0.00' : (Math.random() * 4.2 - 2.1).toFixed(2);
     button.style.setProperty('--tile-angle', `${angle}deg`);
   });
 }
@@ -543,6 +552,7 @@ function cardMorphBounds(index) {
 
 function openTiles() {
   if (view !== 'card' || transitioning || activeIndex < 0) return;
+  const version = ++transitionVersion;
   transitioning = true;
   resetWheel(false);
   randomTileAngles();
@@ -568,8 +578,11 @@ function openTiles() {
       { transform: `translate(0, 0) scale(1, 1) rotate(${angle})`, borderRadius: '5px' },
     ], { duration: 420 + index * 28, delay: index * 18, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' }));
   });
+  runningAnimations = animations;
   Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+    if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
+    runningAnimations = [];
     transitioning = false;
     tileGrid.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
   });
@@ -577,6 +590,7 @@ function openTiles() {
 
 function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   if (view !== 'tiles' || transitioning) return;
+  const version = ++transitionVersion;
   transitioning = true;
   const buttons = [...tileGrid.children];
   const tileBounds = buttons.map((button) => button.getBoundingClientRect());
@@ -601,8 +615,11 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
       }
     });
   }
+  runningAnimations = animations;
   const finish = () => {
+    if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
+    runningAnimations = [];
     tileView.classList.remove('is-active');
     tileView.hidden = true;
     tileView.setAttribute('aria-hidden', 'true');
@@ -865,7 +882,7 @@ deck.addEventListener('touchcancel', () => {
 
 deck.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'touch' || event.button !== 0 || menu.open || view === 'tiles' ||
-      event.target.closest('a, button, summary, input, textarea, select')) return;
+      event.target.closest('a, button, summary, input, textarea, select, .card-copy')) return;
   pointerGesture = startDrag(event.clientX, event.clientY, false, 'pointer');
   deck.setPointerCapture(event.pointerId);
 });
@@ -889,7 +906,7 @@ deck.addEventListener('lostpointercapture', () => {
   pointerGesture = null;
 });
 deck.addEventListener('contextmenu', (event) => {
-  if (!event.target.closest('a, button, summary')) event.preventDefault();
+  if (deck.classList.contains('is-dragging')) event.preventDefault();
 });
 deck.addEventListener('click', (event) => {
   if (performance.now() < suppressClickUntil) {
@@ -908,6 +925,7 @@ window.addEventListener('keydown', (event) => {
     }
     return;
   }
+  if (event.target.closest('a, button, summary') && event.key !== 'Escape') return;
   if (view === 'top') {
     if (!stashSide && ['ArrowDown', 'PageDown', ' '].includes(event.key)) {
       event.preventDefault();

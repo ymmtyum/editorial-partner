@@ -47,8 +47,9 @@ CLIENT = r'''<script>
   stream.onmessage = ({ data }) => {
     const current = JSON.parse(data);
     if (current.content !== previous.content) {
-      const active = document.querySelector('main > .is-active');
-      if (active) sessionStorage.setItem('preview-position', JSON.stringify({ id: active.id, top: active.scrollTop }));
+      const chapter = document.querySelector('.chapter.is-active');
+      const scroller = chapter?.querySelector('.card-copy');
+      if (chapter && scroller) sessionStorage.setItem('preview-position', JSON.stringify({ id: chapter.id, top: scroller.scrollTop }));
       location.reload();
       return;
     }
@@ -66,8 +67,9 @@ CLIENT = r'''<script>
     try {
       const saved = JSON.parse(sessionStorage.getItem('preview-position') || 'null');
       sessionStorage.removeItem('preview-position');
-      const active = document.querySelector('main > .is-active');
-      if (saved && active?.id === saved.id) active.scrollTop = saved.top;
+      const chapter = document.querySelector('.chapter.is-active');
+      const scroller = chapter?.querySelector('.card-copy');
+      if (saved && chapter?.id === saved.id && scroller) scroller.scrollTop = saved.top;
     } catch (_) {}
   });
 })();
