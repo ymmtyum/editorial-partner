@@ -268,7 +268,7 @@ function applyPose() {
 
   if (activeIndex >= 0) {
     const card = cardFor(activeIndex);
-    if (Math.abs(pose.y) > 0.5) {
+    if (pose.y > 0.5) {
       card.style.setProperty('--drag-y', `${pose.y}px`);
       card.classList.add('is-held');
     } else clearCardDrag(activeIndex);
