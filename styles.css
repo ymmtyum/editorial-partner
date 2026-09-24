@@ -38,7 +38,7 @@ main { touch-action: pinch-zoom; }
 .menu-toggle:hover { background: #e9ece2; }
 .menu-toggle:hover span:last-child { width: 15px; }
 .chapter { display: grid; justify-items: center; align-items: safe center; padding: 90px clamp(24px, 7vw, 100px); }
-.story-card { --card-color: #efeee6; position: relative; display: flex; flex-direction: column; width: min(100%, 960px); min-height: min(660px, calc(100svh - 180px)); padding: clamp(28px, 5vw, 66px); border: 1px solid #2d342f08; border-radius: 2px 3px 5px 2px; background: linear-gradient(165deg, #ffffff38, transparent 45%), var(--card-color); box-shadow: 0 2px 3px #2d342f0a, 0 14px 34px -18px #2d342f45; transform-origin: 50% 30%; transition: box-shadow .2s ease-out; }
+.story-card { --card-color: #efeee6; position: relative; display: flex; flex-direction: column; width: min(100%, 960px); height: min(660px, calc(100svh - 180px)); min-height: 0; padding: clamp(28px, 5vw, 66px); border: 1px solid #2d342f08; border-radius: 2px 3px 5px 2px; background: linear-gradient(165deg, #ffffff38, transparent 45%), var(--card-color); box-shadow: 0 2px 3px #2d342f0a, 0 14px 34px -18px #2d342f45; transform-origin: 50% 30%; transition: box-shadow .2s ease-out; }
 .card-1 { --card-color: #e9ece2; }
 .card-2 { --card-color: #e4ebd2; }
 .card-3 { --card-color: #ede9de; }
@@ -50,7 +50,11 @@ main { touch-action: pinch-zoom; }
 .story-card { --card-color: #fff; }
 .card-meta { display: flex; justify-content: space-between; align-items: center; gap: 20px; font: 11px/1.2 Arial, sans-serif; letter-spacing: .15em; }
 .card-number { font: 300 clamp(48px, 7vw, 82px)/1 var(--font-display); letter-spacing: -.04em; }
-.card-copy { width: 100%; margin: auto 0; padding: 32px 0; }
+.card-copy { width: 100%; flex: 1; min-height: 0; margin: 18px 0; padding: 14px 14px 14px 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #89908566 transparent; }
+.card-copy::-webkit-scrollbar { width: 5px; }
+.card-copy::-webkit-scrollbar-track { background: transparent; }
+.card-copy::-webkit-scrollbar-thumb { border-radius: 10px; background: #89908566; }
+.chapter.is-active .card-copy { pointer-events: auto; touch-action: pan-y; }
 .card-copy h2 { margin: 0 0 24px; font: 500 clamp(25px, 3.2vw, 43px)/1.6 var(--font-display); letter-spacing: .04em; overflow-wrap: anywhere; }
 .card-content { font-size: 15px; line-height: 1.95; color: #4e584f; }
 .card-content p { margin: 0 0 18px; }
@@ -122,8 +126,8 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
   .hero-lead { font-size: 12px; letter-spacing: .025em; }
   .menu-toggle { top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); width: 46px; height: 46px; }
   .chapter { padding: 82px 20px 40px; }
-  .story-card { min-height: calc(100svh - 122px); padding: 28px; }
-  .card-copy { padding: 30px 0; }
+  .story-card { height: calc(100svh - 122px); min-height: 0; padding: 28px; }
+  .card-copy { margin: 14px 0; padding: 12px 10px 12px 0; }
   .card-copy h2 { font-size: clamp(24px, 6.5vw, 32px); margin-bottom: 20px; }
   .card-content { font-size: 13px; }
   .menu-dialog { padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
@@ -142,9 +146,9 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
 }
 @media (max-width: 600px) and (max-height: 760px) {
   .chapter { padding: 70px 20px 24px; }
-  .story-card { min-height: calc(100svh - 94px); padding: 24px; }
+  .story-card { height: calc(100svh - 94px); min-height: 0; padding: 24px; }
   .card-number { font-size: 44px; }
-  .card-copy { padding: 20px 0; }
+  .card-copy { margin: 12px 0; padding: 10px 8px 10px 0; }
   .card-copy h2 { font-size: clamp(22px, 6vw, 28px); line-height: 1.5; margin-bottom: 18px; }
   .card-content { font-size: 13px; line-height: 1.85; }
 }
@@ -199,6 +203,9 @@ main.is-dragging { -webkit-user-select: none; }
 body[data-view="top"] .hero { pointer-events: auto; }
 .chapter { z-index: 2; will-change: transform; }
 .card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform-origin: 50% 55%; will-change: transform; }
+.morph-layer { position: fixed; inset: 0; z-index: 13; pointer-events: none; overflow: hidden; }
+.morph-card { position: fixed !important; max-width: none !important; max-height: none !important; min-width: 0 !important; min-height: 0 !important; margin: 0 !important; overflow: hidden !important; pointer-events: none !important; box-shadow: 0 18px 46px -24px #2d342f88 !important; }
+.morph-card * { pointer-events: none !important; }
 .chapter { z-index: var(--stack-level, 1); }
 .chapter.is-active, .chapter.is-stacked, .chapter.is-preview, .chapter.is-leaving { visibility: visible; }
 .chapter.is-active, .chapter.is-preview, .chapter.is-leaving { z-index: var(--stack-level, 1) !important; }
