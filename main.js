@@ -82,13 +82,17 @@ function stackTransform(index, extraY = 0) {
   return `translate(${look.x}px, ${look.y + extraY}px) rotate(${look.angle}deg)`;
 }
 
+function isNeat(index) {
+  return Boolean(chapters[index]?.classList.contains('is-neat'));
+}
+
 function restingTransform(index, extraY = 0) {
-  if (cardStack.classList.contains('is-aligned')) return `translate(0, ${extraY}px) rotate(0deg)`;
+  if (isNeat(index)) return `translate(0, ${extraY}px) rotate(0deg)`;
   return stackTransform(index, extraY);
 }
 
 function restingAngle(index) {
-  return cardStack.classList.contains('is-aligned') ? 0 : lookFor(index).angle;
+  return isNeat(index) ? 0 : lookFor(index).angle;
 }
 
 function setHash(id) {
@@ -229,6 +233,10 @@ function risingCard() {
 function placeRisingCard(y) {
   const card = risingCard();
   if (!card) return;
+  const look = lookFor(0);
+  card.style.setProperty('--stack-x', `${look.x}px`);
+  card.style.setProperty('--stack-y', `${look.y}px`);
+  card.style.setProperty('--stack-angle', `${look.angle}deg`);
   if (card.parentElement !== deck) deck.append(card);
   card.classList.add('is-rising');
   card.style.setProperty('--drag-y', `${cardTravel() + y}px`);
@@ -239,6 +247,9 @@ function clearRisingCard() {
   if (!card) return;
   card.classList.remove('is-rising');
   card.style.removeProperty('--drag-y');
+  card.style.removeProperty('--stack-x');
+  card.style.removeProperty('--stack-y');
+  card.style.removeProperty('--stack-angle');
   chapters[0].append(card);
 }
 
@@ -307,7 +318,7 @@ function captureLivePose() {
     if (activeIndex >= 0) {
       const card = cardFor(activeIndex);
       const matrix = new DOMMatrix(getComputedStyle(card).transform);
-      const restY = cardStack.classList.contains('is-aligned') ? 0 : lookFor(activeIndex).y;
+      const restY = isNeat(activeIndex) ? 0 : lookFor(activeIndex).y;
       pose.y = matrix.m42 - restY;
     }
     cancelTransition();
@@ -446,7 +457,7 @@ function commitEnteredCard() {
   cardStack.classList.remove('is-held');
   activeIndex = 0;
   stashSide = 0;
-  cardStack.classList.remove('is-aligned');
+  chapters.forEach((chapter) => chapter.classList.remove('is-neat'));
   renderStack(0);
   hero.style.opacity = '0';
   setHash(chapters[0].id);
@@ -462,7 +473,7 @@ function commitNextCard() {
   shownNext = -1;
   chapters[activeIndex].classList.remove('is-active');
   chapters[activeIndex].classList.add('is-stacked');
-  cardStack.classList.remove('is-aligned');
+  incoming.classList.remove('is-neat');
   incoming.classList.remove('is-preview');
   incoming.classList.add('is-active');
   cardScrollFor(index).scrollTop = 0;
@@ -480,6 +491,7 @@ function commitPreviousCard() {
   const outgoingIndex = activeIndex;
   const nextIndex = activeIndex - 1;
   clearCardDrag(outgoingIndex);
+  chapters[outgoingIndex].classList.remove('is-neat');
   hideChapter(outgoingIndex);
   chapters[nextIndex].classList.remove('is-stacked');
   chapters[nextIndex].classList.add('is-active');
@@ -762,7 +774,7 @@ function scrollCurrentCard(delta) {
 
 function alignStack() {
   if (view !== 'card' || activeIndex < 1 || transitioning) return;
-  cardStack.classList.add('is-aligned');
+  chapters.slice(0, activeIndex + 1).forEach((chapter) => chapter.classList.add('is-neat'));
   if (reduceMotion.matches) return;
   const version = ++transitionVersion;
   transitioning = true;
@@ -793,12 +805,12 @@ let tileOpenTimer = 0;
 
 function nudgeStack() {
   if (view !== 'card' || activeIndex < 0 || reduceMotion.matches) return;
-  const aligned = cardStack.classList.contains('is-aligned');
   chapters.slice(0, activeIndex + 1).forEach((_, index) => {
     const card = cardFor(index);
     const look = lookFor(index);
-    const rest = aligned ? 'translate(0px, 0px) rotate(0deg)' : `translate(${look.x}px, ${look.y}px) rotate(${look.angle}deg)`;
-    const shaken = aligned
+    const neat = isNeat(index);
+    const rest = neat ? 'translate(0px, 0px) rotate(0deg)' : `translate(${look.x}px, ${look.y}px) rotate(${look.angle}deg)`;
+    const shaken = neat
       ? 'translate(4px, -2px) rotate(.7deg)'
       : `translate(${look.x + 5}px, ${look.y - 2}px) rotate(${look.angle + .8}deg)`;
     card.animate([
