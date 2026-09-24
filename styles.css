@@ -162,6 +162,9 @@ main.is-dragging { cursor: grabbing; user-select: none; }
 .story-card.is-held { box-shadow: 0 6px 10px #2d342f0a, 0 28px 52px -16px #2d342f50; }
 .story-card::before { content: ""; position: absolute; left: 1px; right: 1px; top: 0; height: 1px; background: #ffffff9c; pointer-events: none; }
 .card-meta { padding-bottom: 20px; border-bottom: 1px solid #2d342f18; }
+.card-meta-actions { display: flex; align-items: center; gap: 14px; }
+.align-stack { padding: 7px 12px; border: 1px solid #2d342f40; border-radius: 999px; background: transparent; font: 500 10px/1 var(--font-body); letter-spacing: .05em; transition: color 140ms ease-in-out, background 140ms ease-in-out, transform 140ms ease-in-out; }
+.align-stack:hover { color: #fff; background: var(--ink); transform: translateY(-1px); }
 .is-active a, .is-active button, .is-active summary { cursor: pointer; }
 
 /* Staggered vertical lettering, with two fast, rough marker strokes. */
@@ -203,9 +206,6 @@ main.is-dragging { -webkit-user-select: none; }
 body[data-view="top"] .hero { pointer-events: auto; }
 .chapter { z-index: 2; will-change: transform; }
 .card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform-origin: 50% 55%; will-change: transform; }
-.morph-layer { position: fixed; inset: 0; z-index: 13; pointer-events: none; overflow: hidden; }
-.morph-card { position: fixed !important; max-width: none !important; max-height: none !important; min-width: 0 !important; min-height: 0 !important; margin: 0 !important; overflow: hidden !important; pointer-events: none !important; box-shadow: 0 18px 46px -24px #2d342f88 !important; }
-.morph-card * { pointer-events: none !important; }
 .chapter { z-index: var(--stack-level, 1); }
 .chapter.is-active, .chapter.is-stacked, .chapter.is-preview, .chapter.is-leaving { visibility: visible; }
 .chapter.is-active, .chapter.is-preview, .chapter.is-leaving { z-index: var(--stack-level, 1) !important; }
@@ -217,6 +217,9 @@ body[data-view="top"] .hero { pointer-events: auto; }
   transform: translate(var(--stack-x, 0), var(--stack-y, 0)) rotate(var(--stack-angle, 0deg));
 }
 .chapter.is-stacked .story-card { box-shadow: 0 2px 4px #2d342f12, 0 18px 38px -21px #2d342f66; }
+.card-stack.is-aligned .chapter.is-active .story-card,
+.card-stack.is-aligned .chapter.is-stacked .story-card,
+.card-stack.is-aligned .chapter.is-preview .story-card { transform: translate(0, 0) rotate(0deg); }
 .story-card { will-change: transform; }
 .menu-toggle { transition: opacity 140ms ease-in-out, transform 140ms ease-in-out, background .3s ease-in-out; }
 .menu-toggle.is-hiding { opacity: 0; transform: scale(.88); pointer-events: none; }
@@ -315,8 +318,10 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .tile-card:nth-child(8) { --tile-color: #ece9dd; }
 .tile-card { --tile-color: #fff !important; --tile-angle: 0deg; aspect-ratio: 1; min-height: 0; transform: rotate(var(--tile-angle)); transform-origin: 50% 55%; will-change: transform, opacity; }
 .tile-card:hover { transform: translateY(-7px) rotate(calc(var(--tile-angle) - .5deg)); }
-.tile-number { font: 400 clamp(24px, 3vw, 42px)/1 var(--font-display); letter-spacing: -.04em; }
-.tile-title { font: 600 clamp(14px, 1.5vw, 19px)/1.65 var(--font-display); overflow-wrap: anywhere; }
+.tile-card > .card-meta { width: 100%; flex: 0 0 auto; padding-bottom: clamp(10px, 1.5vw, 18px); }
+.tile-card .card-number { font-size: clamp(24px, 3vw, 44px); }
+.tile-card-copy { display: flex; align-items: center; flex: 1; width: 100%; min-height: 0; padding-top: clamp(10px, 1.8vw, 20px); }
+.tile-heading { font: 500 clamp(13px, 1.45vw, 19px)/1.55 var(--font-display); letter-spacing: .025em; overflow-wrap: anywhere; }
 
 @media (max-width: 800px) {
   .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -327,6 +332,11 @@ body[data-view="top"] .hero { pointer-events: auto; }
   .tile-header { margin-bottom: 24px; }
   .tile-grid { gap: 12px; }
   .tile-card { min-height: 0; padding: 13px; }
-  .tile-number { font-size: clamp(19px, 6vw, 28px); }
-  .tile-title { font-size: clamp(10px, 2.9vw, 13px); line-height: 1.45; }
+  .tile-card > .card-meta { padding-bottom: 8px; }
+  .tile-card .card-number { font-size: clamp(19px, 6vw, 28px); }
+  .tile-card-copy { padding-top: 8px; }
+  .tile-heading { font-size: clamp(9px, 2.7vw, 13px); line-height: 1.42; }
+  .card-meta-actions { gap: 8px; }
+  .card-meta-actions > span:first-child { display: none; }
+  .align-stack { padding: 7px 10px; font-size: 9px; }
 }

@@ -10,10 +10,6 @@ const tileView = document.getElementById('card-list');
 const tileClose = document.querySelector('.tile-close');
 const tileGrid = document.querySelector('.tile-grid');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const morphLayer = document.createElement('div');
-morphLayer.className = 'morph-layer';
-morphLayer.hidden = true;
-document.body.append(morphLayer);
 
 const stackLooks = [
   { x: -7, y: 4, angle: -1.15 },
@@ -52,10 +48,25 @@ chapters.forEach((chapter, index) => {
   button.type = 'button';
   button.className = 'tile-card';
   button.dataset.index = String(index);
-  button.innerHTML = `<span class="tile-number">#${String(index + 1).padStart(2, '0')}</span><span class="tile-title"></span>`;
-  button.querySelector('.tile-title').textContent = title;
+  button.innerHTML = `<span class="card-meta"><span class="card-number">${String(index + 1).padStart(2, '0')}</span></span><span class="tile-card-copy"><span class="tile-heading"></span></span>`;
+  button.querySelector('.tile-heading').textContent = title;
   button.setAttribute('aria-label', `${String(index + 1).padStart(2, '0')} ${title}へ移動`);
   tileGrid.append(button);
+
+  if (index >= 2) {
+    const meta = chapter.querySelector('.card-meta');
+    const label = meta.lastElementChild;
+    const actions = document.createElement('span');
+    actions.className = 'card-meta-actions';
+    const alignButton = document.createElement('button');
+    alignButton.type = 'button';
+    alignButton.className = 'align-stack';
+    alignButton.textContent = 'トントンする';
+    alignButton.setAttribute('aria-label', '積み重なったカードを揃える');
+    actions.append(label, alignButton);
+    meta.append(actions);
+    alignButton.addEventListener('click', alignStack);
+  }
 });
 
 function verticalThreshold() {
@@ -81,6 +92,15 @@ function cardScrollFor(index) {
 function stackTransform(index, extraY = 0) {
   const look = stackLooks[index];
   return `translate(${look.x}px, ${look.y + extraY}px) rotate(${look.angle}deg)`;
+}
+
+function restingTransform(index, extraY = 0) {
+  if (cardStack.classList.contains('is-aligned')) return `translate(0, ${extraY}px) rotate(0deg)`;
+  return stackTransform(index, extraY);
+}
+
+function restingAngle(index) {
+  return cardStack.classList.contains('is-aligned') ? 0 : stackLooks[index].angle;
 }
 
 function setHash(id) {
@@ -191,12 +211,12 @@ function settlePreview() {
   const animations = [];
   if (current.kind === 'next') {
     animations.push(current.card.animate(
-      [{ transform: getComputedStyle(current.card).transform }, { transform: stackTransform(current.index, deck.clientHeight + 60) }],
+      [{ transform: getComputedStyle(current.card).transform }, { transform: restingTransform(current.index, deck.clientHeight + 60) }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ));
   } else if (current.kind === 'previous') {
     animations.push(current.card.animate(
-      [{ transform: getComputedStyle(current.card).transform }, { transform: stackTransform(current.index) }],
+      [{ transform: getComputedStyle(current.card).transform }, { transform: restingTransform(current.index) }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ));
   } else if (current.kind === 'bundle') {
@@ -234,7 +254,7 @@ function previewNext(distance) {
     preview = { kind: 'next', index, card: cardFor(index) };
   }
   const progress = Math.min(1.08, distance / verticalThreshold());
-  preview.card.style.transform = stackTransform(index, (1 - progress) * (deck.clientHeight + 60));
+  preview.card.style.transform = restingTransform(index, (1 - progress) * (deck.clientHeight + 60));
   preview.card.classList.add('is-held');
   deck.classList.add('is-dragging');
 }
@@ -245,7 +265,7 @@ function previewPrevious(distance) {
     clearPreviewInstant();
     preview = { kind: 'previous', index: activeIndex, card: cardFor(activeIndex) };
   }
-  preview.card.style.transform = stackTransform(activeIndex, distance * .9);
+  preview.card.style.transform = restingTransform(activeIndex, distance * .9);
   preview.card.classList.add('is-held');
   deck.classList.add('is-dragging');
 }
@@ -283,7 +303,7 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
   stashSide = 0;
   renderStack(index);
   const card = cardFor(index);
-  card.style.transform = stackTransform(index, deck.clientHeight + 60);
+  card.style.transform = restingTransform(index, deck.clientHeight + 60);
   cardStack.style.transform = 'none';
   document.body.dataset.view = 'transition';
   menuToggle.hidden = true;
@@ -303,7 +323,7 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
   const duration = 250;
   playTransition([
     card.animate(
-      [{ transform: stackTransform(index, deck.clientHeight + 60) }, { transform: stackTransform(index) }],
+      [{ transform: restingTransform(index, deck.clientHeight + 60) }, { transform: restingTransform(index) }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ),
     hero.animate(
@@ -318,7 +338,7 @@ function addCard({ focus = true } = {}) {
   if (index >= chapters.length || transitioning) return;
   const incoming = chapters[index];
   const card = cardFor(index);
-  const start = preview?.kind === 'next' ? getComputedStyle(card).transform : stackTransform(index, deck.clientHeight + 60);
+  const start = preview?.kind === 'next' ? getComputedStyle(card).transform : restingTransform(index, deck.clientHeight + 60);
   preview?.card?.classList.remove('is-held');
   preview = null;
   deck.classList.remove('is-dragging');
@@ -344,7 +364,7 @@ function addCard({ focus = true } = {}) {
   const duration = 210;
   playTransition([
     card.animate(
-      [{ transform: start }, { transform: stackTransform(index) }],
+      [{ transform: start }, { transform: restingTransform(index) }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ),
   ], duration, finish);
@@ -356,7 +376,7 @@ function removeCard({ focus = true } = {}) {
   const nextIndex = activeIndex - 1;
   const outgoing = chapters[outgoingIndex];
   const outgoingCard = cardFor(outgoingIndex);
-  const start = preview?.kind === 'previous' ? getComputedStyle(outgoingCard).transform : stackTransform(outgoingIndex);
+  const start = preview?.kind === 'previous' ? getComputedStyle(outgoingCard).transform : restingTransform(outgoingIndex);
   preview?.card?.classList.remove('is-held');
   preview = null;
   deck.classList.remove('is-dragging');
@@ -379,7 +399,7 @@ function removeCard({ focus = true } = {}) {
   const duration = 210;
   playTransition([
     outgoingCard.animate(
-      [{ transform: start }, { transform: stackTransform(outgoingIndex, deck.clientHeight + 70) }],
+      [{ transform: start }, { transform: restingTransform(outgoingIndex, deck.clientHeight + 70) }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ),
   ], duration, finish);
@@ -478,35 +498,34 @@ function scrollCurrentCard(delta) {
   if (activeIndex >= 0) cardScrollFor(activeIndex).scrollTop += delta;
 }
 
+function alignStack() {
+  if (view !== 'card' || activeIndex < 2 || transitioning) return;
+  const cards = chapters.slice(0, activeIndex + 1).map((_, index) => cardFor(index));
+  const starts = cards.map((card) => getComputedStyle(card).transform);
+  cardStack.classList.add('is-aligned');
+  transitioning = true;
+  const animations = cards.map((card, index) => card.animate([
+    { transform: starts[index] },
+    { transform: 'translate(-3px, 1px) rotate(-.18deg)', offset: .45 },
+    { transform: 'translate(2px, -1px) rotate(.12deg)', offset: .72 },
+    { transform: 'translate(0, 0) rotate(0deg)' },
+  ], {
+    duration: 250,
+    delay: (cards.length - index - 1) * 28,
+    easing: 'ease-in-out',
+    fill: 'both',
+  }));
+  Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+    animations.forEach((animation) => animation.cancel());
+    transitioning = false;
+  });
+}
+
 function randomTileAngles() {
   [...tileGrid.children].forEach((button) => {
     const angle = (Math.random() * 4.2 - 2.1).toFixed(2);
     button.style.setProperty('--tile-angle', `${angle}deg`);
   });
-}
-
-function clearMorphLayer() {
-  morphLayer.replaceChildren();
-  morphLayer.hidden = true;
-}
-
-function createMorphClone(index, bounds) {
-  const clone = cardFor(index).cloneNode(true);
-  clone.classList.remove('is-held');
-  clone.classList.add('morph-card');
-  clone.removeAttribute('id');
-  clone.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
-  clone.querySelectorAll('a, button, summary').forEach((element) => element.setAttribute('tabindex', '-1'));
-  clone.setAttribute('aria-hidden', 'true');
-  clone.inert = true;
-  Object.assign(clone.style, {
-    left: `${bounds.left}px`,
-    top: `${bounds.top}px`,
-    width: `${bounds.width}px`,
-    height: `${bounds.height}px`,
-  });
-  morphLayer.append(clone);
-  return clone;
 }
 
 function cardMorphBounds(index) {
@@ -533,8 +552,6 @@ function openTiles() {
   tileView.setAttribute('aria-hidden', 'false');
   updateControls('tiles');
   const buttons = [...tileGrid.children];
-  clearMorphLayer();
-  morphLayer.hidden = false;
   const animations = [];
   buttons.forEach((button, index) => {
     button.getAnimations().forEach((animation) => animation.cancel());
@@ -544,19 +561,15 @@ function openTiles() {
     const target = button.getBoundingClientRect();
     const dx = source.left + source.width / 2 - (target.left + target.width / 2);
     const dy = source.top + source.height / 2 - (target.top + target.height / 2);
-    const scaleX = target.width / source.width;
-    const scaleY = target.height / source.height;
-    const clone = createMorphClone(index, source);
-    button.style.opacity = '0';
-    animations.push(clone.animate([
-      { transform: `translate(0, 0) scale(1, 1) rotate(${stackLooks[index].angle}deg)`, borderRadius: '3px', opacity: 1 },
-      { transform: `translate(${-dx}px, ${-dy}px) scale(${scaleX}, ${scaleY}) rotate(${angle})`, borderRadius: '5px', opacity: 1 },
-    ], { duration: 390 + index * 34, delay: index * 22, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' }));
+    const scaleX = source.width / target.width;
+    const scaleY = source.height / target.height;
+    animations.push(button.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY}) rotate(${restingAngle(index)}deg)`, borderRadius: '3px' },
+      { transform: `translate(0, 0) scale(1, 1) rotate(${angle})`, borderRadius: '5px' },
+    ], { duration: 420 + index * 28, delay: index * 18, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' }));
   });
-  if (reduceMotion.matches) clearMorphLayer();
   Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
-    buttons.forEach((button) => button.style.removeProperty('opacity'));
-    clearMorphLayer();
+    animations.forEach((animation) => animation.cancel());
     transitioning = false;
     tileGrid.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
   });
@@ -568,8 +581,6 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   const buttons = [...tileGrid.children];
   const tileBounds = buttons.map((button) => button.getBoundingClientRect());
   jumpToCard(targetIndex);
-  clearMorphLayer();
-  morphLayer.hidden = false;
   const animations = [];
   if (!reduceMotion.matches) {
     buttons.forEach((button, index) => {
@@ -579,14 +590,12 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
         const target = cardMorphBounds(index);
         const dx = source.left + source.width / 2 - (target.left + target.width / 2);
         const dy = source.top + source.height / 2 - (target.top + target.height / 2);
-        const scaleX = source.width / target.width;
-        const scaleY = source.height / target.height;
-        const clone = createMorphClone(index, target);
-        button.style.opacity = '0';
-        animations.push(clone.animate([
-          { transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY}) rotate(${angle})`, borderRadius: '5px', opacity: 1 },
-          { transform: `translate(0, 0) scale(1, 1) rotate(${stackLooks[index].angle}deg)`, borderRadius: '3px', opacity: 1 },
-        ], { duration: 330 + (targetIndex - index) * 24, delay: (targetIndex - index) * 14, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' }));
+        const scaleX = target.width / source.width;
+        const scaleY = target.height / source.height;
+        animations.push(button.animate([
+          { transform: `translate(0, 0) scale(1, 1) rotate(${angle})`, borderRadius: '5px', opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY}) rotate(${restingAngle(index)}deg)`, borderRadius: '3px', opacity: 1 },
+        ], { duration: 340 + (targetIndex - index) * 22, delay: (targetIndex - index) * 12, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' }));
       } else {
         animations.push(button.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 130, easing: 'ease-in-out', fill: 'both' }));
       }
@@ -594,8 +603,6 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   }
   const finish = () => {
     animations.forEach((animation) => animation.cancel());
-    buttons.forEach((button) => button.style.removeProperty('opacity'));
-    clearMorphLayer();
     tileView.classList.remove('is-active');
     tileView.hidden = true;
     tileView.setAttribute('aria-hidden', 'true');
