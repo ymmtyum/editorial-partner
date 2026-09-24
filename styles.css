@@ -21,7 +21,7 @@ main { position: fixed; inset: 0; height: 100dvh; overflow: hidden; }
 .hero, .chapter { position: absolute; inset: 0; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; visibility: hidden; pointer-events: none; }
 .hero.is-active, .chapter.is-active { visibility: visible; z-index: 1; }
 /* Keep the wheel/touch hit target on the stationary deck between card changes. */
-main { touch-action: pinch-zoom; }
+main { touch-action: auto; }
 .hero, .chapter { pointer-events: none; scrollbar-width: none; }
 .hero::-webkit-scrollbar, .chapter::-webkit-scrollbar { display: none; }
 .is-active a, .is-active button, .is-active summary { pointer-events: auto; }
@@ -54,7 +54,7 @@ main { touch-action: pinch-zoom; }
 .card-copy::-webkit-scrollbar { width: 5px; }
 .card-copy::-webkit-scrollbar-track { background: transparent; }
 .card-copy::-webkit-scrollbar-thumb { border-radius: 10px; background: #89908566; }
-.chapter.is-active .card-copy { pointer-events: auto; touch-action: pan-y; }
+.chapter.is-active .card-copy { pointer-events: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .card-copy h2 { margin: 0 0 24px; font: 500 clamp(25px, 3.2vw, 43px)/1.6 var(--font-display); letter-spacing: .04em; overflow-wrap: anywhere; }
 .card-content { font-size: 15px; line-height: 1.95; color: #4e584f; }
 .card-content p { margin: 0 0 18px; }

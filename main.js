@@ -703,10 +703,6 @@ window.addEventListener('wheel', (event) => {
   const axis = Math.abs(dx) > Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
   const delta = axis === 'horizontal' ? dx : dy;
   const direction = Math.sign(delta);
-  if (view === 'card' && axis === 'vertical' && event.target instanceof Element && event.target.closest('.card-copy') && canReadFurther(direction)) {
-    if (wheelGesture) finishWheel(false);
-    return;
-  }
   event.preventDefault();
   const now = performance.now();
   const previous = wheelGesture;
@@ -724,6 +720,10 @@ window.addEventListener('wheel', (event) => {
   wheelIdleTimer = setTimeout(() => finishWheel(true), 180);
   if (gesture.mode === 'read') {
     scrollCurrentCard(dy);
+    if (!canReadFurther(direction)) {
+      gesture.mode = 'boundary';
+      gesture.total = 0;
+    }
     return;
   }
   if (transitioning) return;
@@ -745,15 +745,30 @@ window.addEventListener('wheel', (event) => {
 
 function startDrag(x, y, interactive, source) {
   resetWheel(false);
-  return { x, y, lastY: y, dx: 0, dy: 0, mode: null, interactive, source };
+  return { x, y, lastY: y, dx: 0, dy: 0, mode: null, boundaryY: null, boundaryDirection: 0, interactive, source };
 }
 
 function moveDrag(gesture, x, y) {
   if (!gesture || transitioning) return;
-  const dx = x - gesture.x;
-  const dy = y - gesture.y;
+  let dx = x - gesture.x;
+  let dy = y - gesture.y;
   const step = gesture.lastY - y;
   gesture.lastY = y;
+  if (gesture.mode === 'boundary' && gesture.boundaryY !== null) {
+    const boundaryDy = y - gesture.boundaryY;
+    const continuedDirection = Math.sign(-boundaryDy);
+    if (continuedDirection && continuedDirection === gesture.boundaryDirection) {
+      gesture.x = x;
+      gesture.y = gesture.boundaryY;
+      gesture.mode = 'stack';
+      dx = 0;
+      dy = boundaryDy;
+    } else if (continuedDirection) {
+      gesture.mode = 'read';
+      gesture.boundaryY = null;
+      gesture.boundaryDirection = 0;
+    }
+  }
   gesture.dx = dx;
   gesture.dy = dy;
   if (!gesture.mode && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
@@ -764,7 +779,16 @@ function moveDrag(gesture, x, y) {
     else if (view === 'card' && canReadFurther(dy < 0 ? 1 : -1)) gesture.mode = 'read';
     else if (view === 'card') gesture.mode = 'stack';
   }
-  if (gesture.mode === 'read' && gesture.source !== 'touch') scrollCurrentCard(step);
+  if (gesture.mode === 'read') {
+    const direction = Math.sign(step);
+    if (gesture.source !== 'touch') scrollCurrentCard(step);
+    if (direction && !canReadFurther(direction)) {
+      gesture.mode = 'boundary';
+      gesture.boundaryY = y;
+      gesture.boundaryDirection = direction;
+    }
+    return;
+  }
   else if (gesture.mode === 'enter') {
     activeIndex = -1;
     previewNext(Math.max(0, -dy));
@@ -778,7 +802,7 @@ function moveDrag(gesture, x, y) {
 
 function endDrag(gesture) {
   if (!gesture) return;
-  if (!gesture.mode || gesture.mode === 'read') {
+  if (!gesture.mode || gesture.mode === 'read' || gesture.mode === 'boundary') {
     if (preview) settlePreview();
     return;
   }
