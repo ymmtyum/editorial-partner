@@ -47,6 +47,7 @@ main { touch-action: pinch-zoom; }
 .card-6 { --card-color: #e9e5ed; }
 .card-7 { --card-color: #e4e9dc; }
 .card-8 { --card-color: #ece9dd; }
+.story-card { --card-color: #fff; }
 .card-meta { display: flex; justify-content: space-between; align-items: center; gap: 20px; font: 11px/1.2 Arial, sans-serif; letter-spacing: .15em; }
 .card-number { font: 300 clamp(48px, 7vw, 82px)/1 var(--font-display); letter-spacing: -.04em; }
 .card-copy { width: 100%; margin: auto 0; padding: 32px 0; }
@@ -75,6 +76,19 @@ main { touch-action: pinch-zoom; }
 .profile-photo { width: 100px; height: 100px; border-radius: 3px; }
 .muted { color: var(--muted); }
 .pullquote { font-family: var(--font-display); font-size: 23px; }
+.text-large { margin-bottom: clamp(28px, 5vh, 52px) !important; font: 600 clamp(27px, 4vw, 50px)/1.55 var(--font-display); letter-spacing: .04em; color: var(--ink); }
+.text-small { font-size: 12px; line-height: 1.9; color: var(--muted); }
+.statement-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.statement-list p { margin: 0; padding: 18px 18px 18px 0; border-bottom: 1px solid var(--line); }
+.statement-list p:nth-child(odd) { padding-right: 24px; }
+.statement-list p:nth-child(even) { padding-left: 24px; border-left: 1px solid var(--line); }
+.article-examples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; counter-reset: example; }
+.article-examples p { counter-increment: example; position: relative; min-height: 190px; margin: 0; padding: 54px 20px 20px; border: 1px solid var(--line); background: #f6f6f2; }
+.article-examples p::before { content: "0" counter(example); position: absolute; top: 18px; left: 20px; font: 11px/1 Arial, sans-serif; letter-spacing: .14em; color: var(--muted); }
+.plus-alpha { margin-top: 28px !important; padding: 18px 20px; border: 1px dashed #7f887d; font-family: var(--font-display); }
+.resource-list { margin-bottom: 32px; font-size: clamp(16px, 2vw, 22px); line-height: 1.75; }
+.resource-list sup { font-size: .65em; }
+.note-text { padding-top: 24px; border-top: 1px solid var(--line); }
 .pain-list, .type-list, .numbered { padding-left: 22px; }
 .pain-list li, .type-list li, .numbered li { margin-bottom: 16px; }
 .case-links { display: grid; gap: 12px; margin-bottom: 26px; }
@@ -117,6 +131,9 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
   .profile { grid-template-columns: 1fr; }
   .case-link { grid-template-columns: 1fr; }
   .case-image { aspect-ratio: 1.91 / 1; min-height: 0; }
+  .statement-list, .article-examples { grid-template-columns: 1fr; }
+  .statement-list p:nth-child(even) { padding-left: 0; border-left: 0; }
+  .article-examples p { min-height: 0; }
 }
 @media (max-height: 540px) and (min-width: 601px) {
   .hero { flex-direction: row-reverse; gap: 64px; padding: 40px 80px; }
@@ -279,17 +296,19 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .tile-card:nth-child(6) { --tile-color: #e9e5ed; }
 .tile-card:nth-child(7) { --tile-color: #e4e9dc; }
 .tile-card:nth-child(8) { --tile-color: #ece9dd; }
+.tile-card { --tile-color: #fff !important; aspect-ratio: 1; min-height: 0; }
 .tile-number { font: 400 clamp(24px, 3vw, 42px)/1 var(--font-display); letter-spacing: -.04em; }
 .tile-title { font: 600 clamp(14px, 1.5vw, 19px)/1.65 var(--font-display); overflow-wrap: anywhere; }
 
 @media (max-width: 800px) {
-  .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
   .tile-toggle { right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 48px; height: 48px; }
   .tile-view { padding: max(24px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); }
   .tile-header { margin-bottom: 24px; }
   .tile-grid { gap: 12px; }
-  .tile-card { min-height: 160px; padding: 18px; }
-  .tile-title { font-size: 14px; }
+  .tile-card { min-height: 0; padding: 13px; }
+  .tile-number { font-size: clamp(19px, 6vw, 28px); }
+  .tile-title { font-size: clamp(10px, 2.9vw, 13px); line-height: 1.45; }
 }

@@ -5,7 +5,7 @@ const hero = document.getElementById('top');
 const chapters = [...deck.querySelectorAll(':scope > .chapter')];
 const indexLinks = [...menu.querySelectorAll('a[href^="#"]')];
 const tileToggle = document.querySelector('.tile-toggle');
-const tileView = document.getElementById('card-index');
+const tileView = document.getElementById('card-list');
 const tileClose = document.querySelector('.tile-close');
 const tileGrid = document.querySelector('.tile-grid');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
