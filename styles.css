@@ -198,8 +198,18 @@ main.is-dragging { -webkit-user-select: none; }
 }
 body[data-view="top"] .hero { pointer-events: auto; }
 .chapter { z-index: 2; will-change: transform; }
-.chapter.is-active, .chapter.is-preview, .chapter.is-leaving { visibility: visible; }
+.card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform-origin: 50% 55%; will-change: transform; }
+.chapter { z-index: var(--stack-level, 1); }
+.chapter.is-active, .chapter.is-stacked, .chapter.is-preview, .chapter.is-leaving { visibility: visible; }
+.chapter.is-active, .chapter.is-preview, .chapter.is-leaving { z-index: var(--stack-level, 1) !important; }
 .chapter.is-preview { pointer-events: none; }
+.chapter.is-stacked { pointer-events: none; overflow: hidden; }
+.chapter.is-active .story-card,
+.chapter.is-stacked .story-card,
+.chapter.is-preview .story-card {
+  transform: translate(var(--stack-x, 0), var(--stack-y, 0)) rotate(var(--stack-angle, 0deg));
+}
+.chapter.is-stacked .story-card { box-shadow: 0 2px 4px #2d342f12, 0 18px 38px -21px #2d342f66; }
 .story-card { will-change: transform; }
 .menu-toggle { transition: opacity 140ms ease-in-out, transform 140ms ease-in-out, background .3s ease-in-out; }
 .menu-toggle.is-hiding { opacity: 0; transform: scale(.88); pointer-events: none; }
@@ -296,7 +306,8 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .tile-card:nth-child(6) { --tile-color: #e9e5ed; }
 .tile-card:nth-child(7) { --tile-color: #e4e9dc; }
 .tile-card:nth-child(8) { --tile-color: #ece9dd; }
-.tile-card { --tile-color: #fff !important; aspect-ratio: 1; min-height: 0; }
+.tile-card { --tile-color: #fff !important; --tile-angle: 0deg; aspect-ratio: 1; min-height: 0; transform: rotate(var(--tile-angle)); transform-origin: 50% 55%; will-change: transform, opacity; }
+.tile-card:hover { transform: translateY(-7px) rotate(calc(var(--tile-angle) - .5deg)); }
 .tile-number { font: 400 clamp(24px, 3vw, 42px)/1 var(--font-display); letter-spacing: -.04em; }
 .tile-title { font: 600 clamp(14px, 1.5vw, 19px)/1.65 var(--font-display); overflow-wrap: anywhere; }
 

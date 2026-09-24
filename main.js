@@ -2,7 +2,8 @@ const menu = document.getElementById('site-menu');
 const menuToggle = document.querySelector('.menu-toggle');
 const deck = document.querySelector('main');
 const hero = document.getElementById('top');
-const chapters = [...deck.querySelectorAll(':scope > .chapter')];
+const cardStack = document.querySelector('.card-stack');
+const chapters = [...cardStack.querySelectorAll(':scope > .chapter')];
 const indexLinks = [...menu.querySelectorAll('a[href^="#"]')];
 const tileToggle = document.querySelector('.tile-toggle');
 const tileView = document.getElementById('card-list');
@@ -10,30 +11,68 @@ const tileClose = document.querySelector('.tile-close');
 const tileGrid = document.querySelector('.tile-grid');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
+const stackLooks = [
+  { x: -7, y: 4, angle: -1.15 },
+  { x: 6, y: 1, angle: .72 },
+  { x: -3, y: 5, angle: -.42 },
+  { x: 8, y: 3, angle: 1.02 },
+  { x: -6, y: 1, angle: -.78 },
+  { x: 4, y: 5, angle: .48 },
+  { x: -8, y: 2, angle: -.94 },
+  { x: 3, y: 3, angle: .28 },
+];
+
 let view = 'top';
 let activeIndex = -1;
+let stashSide = 0;
 let transitioning = false;
 let transitionVersion = 0;
 let runningAnimations = [];
 let transitionTimer;
+let preview = null;
 let wheelGesture = null;
 let wheelIdleTimer;
-let preview = null;
 let touchGesture = null;
 let pointerGesture = null;
 let suppressClickUntil = 0;
-const holdDelay = 150;
+
+chapters.forEach((chapter, index) => {
+  const look = stackLooks[index];
+  chapter.style.setProperty('--stack-level', String(index + 1));
+  chapter.style.setProperty('--stack-x', `${look.x}px`);
+  chapter.style.setProperty('--stack-y', `${look.y}px`);
+  chapter.style.setProperty('--stack-angle', `${look.angle}deg`);
+
+  const title = chapter.querySelector('h2')?.textContent.trim() || '';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'tile-card';
+  button.dataset.index = String(index);
+  button.innerHTML = `<span class="tile-number">#${String(index + 1).padStart(2, '0')}</span><span class="tile-title"></span>`;
+  button.querySelector('.tile-title').textContent = title;
+  button.setAttribute('aria-label', `${String(index + 1).padStart(2, '0')} ${title}へ移動`);
+  tileGrid.append(button);
+});
 
 function verticalThreshold() {
-  return Math.max(110, Math.min(180, deck.clientHeight * 0.2));
+  return Math.max(110, Math.min(180, deck.clientHeight * .2));
 }
 
 function horizontalThreshold() {
-  return Math.max(130, Math.min(240, deck.clientWidth * 0.24));
+  return Math.max(130, Math.min(240, deck.clientWidth * .24));
+}
+
+function bundleDistance() {
+  return deck.clientWidth + Math.min(1100, deck.clientWidth * .8);
 }
 
 function cardFor(index) {
   return chapters[index]?.querySelector('.story-card');
+}
+
+function stackTransform(index, extraY = 0) {
+  const look = stackLooks[index];
+  return `translate(${look.x}px, ${look.y + extraY}px) rotate(${look.angle}deg)`;
 }
 
 function setHash(id) {
@@ -41,21 +80,8 @@ function setHash(id) {
   if (location.hash !== hash) history.replaceState(null, '', hash);
 }
 
-function updateControls(nextView) {
-  view = nextView;
-  document.body.dataset.view = nextView;
-  const onTop = nextView === 'top';
-  menuToggle.hidden = !onTop;
-  menuToggle.classList.toggle('is-hiding', !onTop);
-  tileToggle.hidden = nextView !== 'card';
-  tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
-  hero.inert = !onTop;
-  if (onTop) hero.removeAttribute('aria-hidden');
-  else hero.setAttribute('aria-hidden', 'true');
-}
-
 function updateCurrentLinks() {
-  const currentHash = activeIndex < 0 ? '#top' : `#${chapters[activeIndex].id}`;
+  const currentHash = view === 'top' || activeIndex < 0 ? '#top' : `#${chapters[activeIndex].id}`;
   indexLinks.forEach((link) => {
     if (link.hash === currentHash) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
@@ -66,20 +92,41 @@ function updateCurrentLinks() {
   });
 }
 
-function showChapterElement(index, className = 'is-active') {
-  const chapter = chapters[index];
-  chapter.classList.add(className);
-  chapter.inert = className !== 'is-active';
-  chapter.removeAttribute('aria-hidden');
+function updateControls(nextView) {
+  view = nextView;
+  document.body.dataset.view = nextView;
+  const onTop = nextView === 'top';
+  menuToggle.hidden = !onTop;
+  tileToggle.hidden = nextView !== 'card';
+  tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
+  hero.inert = !onTop;
+  hero.toggleAttribute('aria-hidden', !onTop);
+  chapters.forEach((chapter, index) => {
+    const isCurrent = index === activeIndex && nextView === 'card';
+    chapter.inert = !isCurrent;
+    chapter.toggleAttribute('aria-hidden', !isCurrent);
+  });
+  updateCurrentLinks();
 }
 
-function hideChapterElement(index) {
+function hideChapter(index) {
   const chapter = chapters[index];
   if (!chapter) return;
-  chapter.classList.remove('is-active', 'is-preview', 'is-leaving');
+  chapter.classList.remove('is-active', 'is-stacked', 'is-preview', 'is-leaving');
   chapter.inert = true;
   chapter.setAttribute('aria-hidden', 'true');
-  cardFor(index)?.style.removeProperty('transform');
+  cardFor(index).style.removeProperty('transform');
+}
+
+function renderStack(index) {
+  chapters.forEach((chapter, chapterIndex) => {
+    chapter.classList.remove('is-active', 'is-stacked', 'is-preview', 'is-leaving');
+    cardFor(chapterIndex).style.removeProperty('transform');
+    if (chapterIndex < index) chapter.classList.add('is-stacked');
+    else if (chapterIndex === index) chapter.classList.add('is-active');
+    chapter.inert = true;
+    chapter.setAttribute('aria-hidden', 'true');
+  });
 }
 
 function cancelTransition() {
@@ -94,10 +141,10 @@ function playTransition(animations, duration, finish) {
   const version = ++transitionVersion;
   transitioning = true;
   runningAnimations = animations;
-  let finished = false;
+  let done = false;
   const complete = () => {
-    if (finished || version !== transitionVersion) return;
-    finished = true;
+    if (done || version !== transitionVersion) return;
+    done = true;
     clearTimeout(transitionTimer);
     runningAnimations.forEach((animation) => animation.cancel());
     runningAnimations = [];
@@ -105,219 +152,310 @@ function playTransition(animations, duration, finish) {
     finish();
   };
   Promise.allSettled(animations.map((animation) => animation.finished)).then(complete);
-  transitionTimer = setTimeout(complete, duration + 100);
+  transitionTimer = setTimeout(complete, duration + 120);
 }
 
-function clearPreviewStyles() {
+function clearPreviewInstant() {
   if (!preview) return;
-  preview.card.classList.remove('is-held');
-  preview.card.style.removeProperty('transform');
-  if (preview.kind === 'top') hideChapterElement(preview.index);
-  hero.style.removeProperty('opacity');
+  if (preview.kind === 'next') hideChapter(preview.index);
+  if (preview.card) {
+    preview.card.style.removeProperty('transform');
+    preview.card.classList.remove('is-held');
+  }
+  if (preview.kind === 'bundle') cardStack.style.transform = 'none';
+  if (preview.kind === 'restore') {
+    cardStack.style.transform = `translateX(${stashSide * bundleDistance()}px) rotate(${stashSide * 2}deg)`;
+  }
+  hero.style.opacity = view === 'top' ? '1' : '0';
+  cardStack.classList.remove('is-held');
   deck.classList.remove('is-dragging');
   preview = null;
-}
-
-function beginTopPreview(distance = 0) {
-  if (transitioning || view !== 'top') return;
-  const index = 0;
-  const card = cardFor(index);
-  if (!preview) {
-    showChapterElement(index, 'is-preview');
-    preview = { kind: 'top', index, card };
-  }
-  const progress = Math.min(1, Math.max(0, distance / verticalThreshold()));
-  const startY = deck.clientHeight + 48;
-  const y = Math.max(0, startY - distance * 5.2);
-  card.style.transform = `translateY(${y}px)`;
-  hero.style.opacity = String(1 - progress * 0.82);
-  card.classList.add('is-held');
-  deck.classList.add('is-dragging');
-}
-
-function followCard(dx, dy, axis) {
-  if (transitioning || view !== 'card' || activeIndex < 0) return;
-  const card = cardFor(activeIndex);
-  preview = preview || { kind: 'card', index: activeIndex, card };
-  const isHorizontal = axis === 'horizontal';
-  const x = isHorizontal ? Math.max(-deck.clientWidth * .72, Math.min(deck.clientWidth * .72, dx * .92)) : dx * .16;
-  const y = isHorizontal ? dy * .08 : dy * .82;
-  const tilt = reduceMotion.matches ? 0 : Math.max(-2.2, Math.min(2.2, x * .012));
-  card.style.transform = `translate(${x}px, ${y}px) rotate(${tilt}deg)`;
-  if (isHorizontal) {
-    const reveal = Math.min(.96, Math.abs(dx) / horizontalThreshold() * .88);
-    hero.style.opacity = String(reveal);
-  }
-  card.classList.add('is-held');
-  deck.classList.add('is-dragging');
 }
 
 function settlePreview() {
   if (!preview || transitioning) return;
   const current = preview;
-  const from = getComputedStyle(current.card).transform;
-  const heroFrom = getComputedStyle(hero).opacity;
-  const targetY = current.kind === 'top' ? deck.clientHeight + 48 : 0;
-  const duration = reduceMotion.matches ? 0 : 150;
+  const duration = reduceMotion.matches ? 0 : 170;
   if (!duration) {
-    clearPreviewStyles();
+    clearPreviewInstant();
     return;
   }
-  const cardAnimation = current.card.animate(
-    [{ transform: from }, { transform: current.kind === 'top' ? `translateY(${targetY}px)` : 'translate(0, 0) rotate(0deg)' }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  const heroAnimation = hero.animate(
-    [{ opacity: heroFrom }, { opacity: current.kind === 'top' ? 1 : 0 }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  playTransition([cardAnimation, heroAnimation], duration, clearPreviewStyles);
+  const animations = [];
+  if (current.kind === 'next') {
+    animations.push(current.card.animate(
+      [{ transform: getComputedStyle(current.card).transform }, { transform: stackTransform(current.index, deck.clientHeight + 60) }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ));
+  } else if (current.kind === 'previous') {
+    animations.push(current.card.animate(
+      [{ transform: getComputedStyle(current.card).transform }, { transform: stackTransform(current.index) }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ));
+  } else if (current.kind === 'bundle') {
+    animations.push(cardStack.animate(
+      [{ transform: getComputedStyle(cardStack).transform }, { transform: 'translateX(0) rotate(0deg)' }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ));
+    animations.push(hero.animate(
+      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 0 }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ));
+  } else if (current.kind === 'restore') {
+    animations.push(cardStack.animate(
+      [{ transform: getComputedStyle(cardStack).transform }, { transform: `translateX(${stashSide * bundleDistance()}px) rotate(${stashSide * 2}deg)` }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ));
+    animations.push(hero.animate(
+      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 1 }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ));
+  }
+  playTransition(animations, duration, clearPreviewInstant);
 }
 
-function enterCard(index, { animate = true, focus = true, updateHash = true } = {}) {
-  if (index < 0 || index >= chapters.length) return;
-  cancelTransition();
-  const chapter = chapters[index];
-  const card = cardFor(index);
-  const cameFromPreview = preview?.kind === 'top' && preview.index === index;
-  const startTransform = cameFromPreview ? getComputedStyle(card).transform : `translateY(${deck.clientHeight + 48}px)`;
-  preview?.card.classList.remove('is-held');
-  preview = null;
-  deck.classList.remove('is-dragging');
-  chapters.forEach((_, chapterIndex) => {
-    if (chapterIndex !== index) hideChapterElement(chapterIndex);
-  });
-  chapter.classList.remove('is-preview', 'is-leaving');
-  showChapterElement(index);
-  chapter.scrollTop = 0;
+function previewNext(distance) {
+  const index = activeIndex + 1;
+  if (index >= chapters.length) return;
+  if (!preview || preview.kind !== 'next') {
+    clearPreviewInstant();
+    const chapter = chapters[index];
+    chapter.classList.add('is-preview');
+    chapter.style.setProperty('--stack-level', String(index + 1));
+    chapter.inert = true;
+    chapter.setAttribute('aria-hidden', 'true');
+    preview = { kind: 'next', index, card: cardFor(index) };
+  }
+  const progress = Math.min(1.08, distance / verticalThreshold());
+  preview.card.style.transform = stackTransform(index, (1 - progress) * (deck.clientHeight + 60));
+  preview.card.classList.add('is-held');
+  deck.classList.add('is-dragging');
+}
+
+function previewPrevious(distance) {
+  if (activeIndex <= 0) return;
+  if (!preview || preview.kind !== 'previous') {
+    clearPreviewInstant();
+    preview = { kind: 'previous', index: activeIndex, card: cardFor(activeIndex) };
+  }
+  preview.card.style.transform = stackTransform(activeIndex, distance * .9);
+  preview.card.classList.add('is-held');
+  deck.classList.add('is-dragging');
+}
+
+function previewBundle(dx) {
+  if (!preview || preview.kind !== 'bundle') {
+    clearPreviewInstant();
+    preview = { kind: 'bundle' };
+  }
+  const x = Math.max(-deck.clientWidth * .8, Math.min(deck.clientWidth * .8, dx * .92));
+  cardStack.style.transform = `translateX(${x}px) rotate(${x * .0025}deg)`;
+  hero.style.opacity = String(Math.min(.95, Math.abs(dx) / horizontalThreshold() * .86));
+  cardStack.classList.add('is-held');
+  deck.classList.add('is-dragging');
+}
+
+function previewRestore(dx) {
+  if (!stashSide || dx * stashSide >= 0) return;
+  if (!preview || preview.kind !== 'restore') {
+    clearPreviewInstant();
+    preview = { kind: 'restore' };
+  }
+  const progress = Math.min(1.08, Math.abs(dx) / horizontalThreshold());
+  const x = stashSide * bundleDistance() * (1 - progress);
+  cardStack.style.transform = `translateX(${x}px) rotate(${stashSide * 2 * (1 - progress)}deg)`;
+  hero.style.opacity = String(Math.max(0, 1 - progress));
+  cardStack.classList.add('is-held');
+  deck.classList.add('is-dragging');
+}
+
+function enterStack(index = 0, { animate = true, focus = true } = {}) {
+  if (index < 0 || index >= chapters.length || transitioning) return;
+  clearPreviewInstant();
   activeIndex = index;
+  stashSide = 0;
+  renderStack(index);
+  const card = cardFor(index);
+  card.style.transform = stackTransform(index, deck.clientHeight + 60);
+  cardStack.style.transform = 'none';
+  document.body.dataset.view = 'transition';
   menuToggle.hidden = true;
   tileToggle.hidden = true;
   hero.inert = true;
-  hero.setAttribute('aria-hidden', 'true');
-  document.body.dataset.view = 'transition';
-  updateCurrentLinks();
-  if (updateHash) setHash(chapter.id);
-
+  setHash(chapters[index].id);
   const finish = () => {
     card.style.removeProperty('transform');
     hero.style.opacity = '0';
     updateControls('card');
-    if (focus) chapter.focus({ preventScroll: true });
+    if (focus) chapters[index].focus({ preventScroll: true });
   };
   if (!animate || reduceMotion.matches) {
     finish();
     return;
   }
-  const duration = 220;
-  const cardAnimation = card.animate(
-    [{ transform: startTransform }, { transform: 'translateY(0)' }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  const heroAnimation = hero.animate(
-    [{ opacity: getComputedStyle(hero).opacity }, { opacity: 0 }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  playTransition([cardAnimation, heroAnimation], duration, finish);
+  const duration = 250;
+  playTransition([
+    card.animate(
+      [{ transform: stackTransform(index, deck.clientHeight + 60) }, { transform: stackTransform(index) }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+    hero.animate(
+      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 0 }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+  ], duration, finish);
 }
 
-function returnToTop(direction = 1, { animate = true, focus = true, updateHash = true } = {}) {
-  if (activeIndex < 0) return;
-  cancelTransition();
-  const oldIndex = activeIndex;
-  const chapter = chapters[oldIndex];
-  const card = cardFor(oldIndex);
-  const startTransform = getComputedStyle(card).transform;
-  const bounds = card.getBoundingClientRect();
-  const distance = deck.clientWidth + bounds.width;
-  preview?.card.classList.remove('is-held');
+function addCard({ focus = true } = {}) {
+  const index = activeIndex + 1;
+  if (index >= chapters.length || transitioning) return;
+  const incoming = chapters[index];
+  const card = cardFor(index);
+  const start = preview?.kind === 'next' ? getComputedStyle(card).transform : stackTransform(index, deck.clientHeight + 60);
+  preview?.card?.classList.remove('is-held');
   preview = null;
   deck.classList.remove('is-dragging');
-  menuToggle.hidden = true;
-  tileToggle.hidden = true;
-  tileView.hidden = true;
-  tileView.classList.remove('is-active');
-  document.body.dataset.view = 'transition';
-  hero.inert = true;
-  hero.removeAttribute('aria-hidden');
-  if (updateHash) setHash('top');
-
+  chapters[activeIndex].classList.remove('is-active');
+  chapters[activeIndex].classList.add('is-stacked');
+  chapters[activeIndex].inert = true;
+  chapters[activeIndex].setAttribute('aria-hidden', 'true');
+  incoming.classList.remove('is-preview');
+  incoming.classList.add('is-active');
+  incoming.scrollTop = 0;
+  activeIndex = index;
+  setHash(incoming.id);
+  updateCurrentLinks();
   const finish = () => {
-    hideChapterElement(oldIndex);
-    activeIndex = -1;
     card.style.removeProperty('transform');
-    hero.style.removeProperty('opacity');
-    updateControls('top');
-    updateCurrentLinks();
-    if (focus) hero.focus({ preventScroll: true });
+    updateControls('card');
+    if (focus) incoming.focus({ preventScroll: true });
   };
-  if (!animate || reduceMotion.matches) {
+  if (reduceMotion.matches) {
     finish();
     return;
   }
   const duration = 210;
-  const cardAnimation = card.animate(
-    [{ transform: startTransform }, { transform: `translateX(${direction * distance}px) rotate(${direction * 2.5}deg)` }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  const heroAnimation = hero.animate(
-    [{ opacity: getComputedStyle(hero).opacity }, { opacity: 1 }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  playTransition([cardAnimation, heroAnimation], duration, finish);
+  playTransition([
+    card.animate(
+      [{ transform: start }, { transform: stackTransform(index) }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+  ], duration, finish);
 }
 
-function switchCard(index, { animate = true, focus = true, updateHash = true } = {}) {
-  if (index < 0 || index >= chapters.length || index === activeIndex) return;
-  if (activeIndex < 0) {
-    enterCard(index, { animate, focus, updateHash });
-    return;
-  }
-  cancelTransition();
-  const oldIndex = activeIndex;
-  const direction = index > oldIndex ? 1 : -1;
-  const outgoing = chapters[oldIndex];
-  const incoming = chapters[index];
-  const outgoingCard = cardFor(oldIndex);
-  const incomingCard = cardFor(index);
-  const outgoingStart = getComputedStyle(outgoingCard).transform;
-  preview?.card.classList.remove('is-held');
+function removeCard({ focus = true } = {}) {
+  if (activeIndex <= 0 || transitioning) return;
+  const outgoingIndex = activeIndex;
+  const nextIndex = activeIndex - 1;
+  const outgoing = chapters[outgoingIndex];
+  const outgoingCard = cardFor(outgoingIndex);
+  const start = preview?.kind === 'previous' ? getComputedStyle(outgoingCard).transform : stackTransform(outgoingIndex);
+  preview?.card?.classList.remove('is-held');
   preview = null;
   deck.classList.remove('is-dragging');
   outgoing.classList.remove('is-active');
   outgoing.classList.add('is-leaving');
-  outgoing.inert = true;
-  outgoing.setAttribute('aria-hidden', 'true');
-  showChapterElement(index);
-  incoming.scrollTop = 0;
-  activeIndex = index;
+  chapters[nextIndex].classList.remove('is-stacked');
+  chapters[nextIndex].classList.add('is-active');
+  activeIndex = nextIndex;
+  setHash(chapters[nextIndex].id);
   updateCurrentLinks();
-  if (updateHash) setHash(incoming.id);
-
-  const frame = deck.getBoundingClientRect();
-  const outgoingBounds = outgoingCard.getBoundingClientRect();
-  const incomingBounds = incomingCard.getBoundingClientRect();
-  const outgoingDistance = direction > 0 ? outgoingBounds.bottom - frame.top + 40 : frame.bottom - outgoingBounds.top + 40;
-  const incomingDistance = direction > 0 ? frame.bottom - incomingBounds.top + 40 : incomingBounds.bottom - frame.top + 40;
   const finish = () => {
-    hideChapterElement(oldIndex);
-    incomingCard.style.removeProperty('transform');
-    if (focus) incoming.focus({ preventScroll: true });
+    hideChapter(outgoingIndex);
+    updateControls('card');
+    if (focus) chapters[nextIndex].focus({ preventScroll: true });
   };
-  if (!animate || reduceMotion.matches) {
+  if (reduceMotion.matches) {
     finish();
     return;
   }
-  const duration = 190;
-  const outgoingAnimation = outgoingCard.animate(
-    [{ transform: outgoingStart }, { transform: `translateY(${-direction * outgoingDistance}px)` }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  const incomingAnimation = incomingCard.animate(
-    [{ transform: `translateY(${direction * incomingDistance}px)` }, { transform: 'translateY(0)' }],
-    { duration, easing: 'ease-in-out', fill: 'both' },
-  );
-  playTransition([outgoingAnimation, incomingAnimation], duration, finish);
+  const duration = 210;
+  playTransition([
+    outgoingCard.animate(
+      [{ transform: start }, { transform: stackTransform(outgoingIndex, deck.clientHeight + 70) }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+  ], duration, finish);
+}
+
+function stashBundle(side, { focus = true } = {}) {
+  if (view !== 'card' || activeIndex < 0 || transitioning) return;
+  const direction = side || 1;
+  const start = getComputedStyle(cardStack).transform;
+  preview = null;
+  cardStack.classList.remove('is-held');
+  deck.classList.remove('is-dragging');
+  stashSide = direction;
+  document.body.dataset.view = 'transition';
+  menuToggle.hidden = true;
+  tileToggle.hidden = true;
+  hero.removeAttribute('aria-hidden');
+  setHash('top');
+  const target = `translateX(${direction * bundleDistance()}px) rotate(${direction * 2}deg)`;
+  const finish = () => {
+    cardStack.style.transform = target;
+    hero.style.opacity = '1';
+    updateControls('top');
+    if (focus) hero.focus({ preventScroll: true });
+  };
+  if (reduceMotion.matches) {
+    finish();
+    return;
+  }
+  const duration = 230;
+  playTransition([
+    cardStack.animate(
+      [{ transform: start }, { transform: target }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+    hero.animate(
+      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 1 }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+  ], duration, finish);
+}
+
+function restoreBundle({ focus = true } = {}) {
+  if (view !== 'top' || activeIndex < 0 || !stashSide || transitioning) return;
+  const start = getComputedStyle(cardStack).transform;
+  preview = null;
+  cardStack.classList.remove('is-held');
+  deck.classList.remove('is-dragging');
+  document.body.dataset.view = 'transition';
+  menuToggle.hidden = true;
+  tileToggle.hidden = true;
+  setHash(chapters[activeIndex].id);
+  const finish = () => {
+    cardStack.style.transform = 'none';
+    hero.style.opacity = '0';
+    stashSide = 0;
+    updateControls('card');
+    if (focus) chapters[activeIndex].focus({ preventScroll: true });
+  };
+  if (reduceMotion.matches) {
+    finish();
+    return;
+  }
+  const duration = 230;
+  playTransition([
+    cardStack.animate(
+      [{ transform: start }, { transform: 'translateX(0) rotate(0deg)' }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+    hero.animate(
+      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 0 }],
+      { duration, easing: 'ease-in-out', fill: 'both' },
+    ),
+  ], duration, finish);
+}
+
+function jumpToCard(index) {
+  if (index < 0 || index >= chapters.length) return;
+  activeIndex = index;
+  renderStack(index);
+  cardStack.style.transform = 'none';
+  stashSide = 0;
+  setHash(chapters[index].id);
+  updateCurrentLinks();
 }
 
 function canReadFurther(direction) {
@@ -332,55 +470,84 @@ function scrollCurrentCard(delta) {
   if (activeIndex >= 0) chapters[activeIndex].scrollTop += delta;
 }
 
+function randomTileAngles() {
+  [...tileGrid.children].forEach((button) => {
+    const angle = (Math.random() * 4.2 - 2.1).toFixed(2);
+    button.style.setProperty('--tile-angle', `${angle}deg`);
+  });
+}
+
 function openTiles() {
-  if (view !== 'card' || transitioning) return;
+  if (view !== 'card' || transitioning || activeIndex < 0) return;
   resetWheel(false);
+  randomTileAngles();
   tileView.hidden = false;
-  tileView.setAttribute('aria-hidden', 'false');
-  chapters[activeIndex].inert = true;
-  updateControls('tiles');
-  const finish = () => tileView.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
   tileView.classList.add('is-active');
-  if (reduceMotion.matches) {
-    finish();
-    return;
-  }
-  tileView.animate(
-    [{ opacity: 0, transform: 'scale(.985)' }, { opacity: 1, transform: 'scale(1)' }],
-    { duration: 170, easing: 'ease-in-out' },
-  ).finished.then(finish, () => {});
+  tileView.setAttribute('aria-hidden', 'false');
+  updateControls('tiles');
+  const buttons = [...tileGrid.children];
+  const animations = [];
+  buttons.forEach((button, index) => {
+    button.getAnimations().forEach((animation) => animation.cancel());
+    const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
+    if (index > activeIndex || reduceMotion.matches) return;
+    const source = cardFor(index).getBoundingClientRect();
+    const target = button.getBoundingClientRect();
+    const dx = source.left + source.width / 2 - (target.left + target.width / 2);
+    const dy = source.top + source.height / 2 - (target.top + target.height / 2);
+    const scale = Math.max(source.width / target.width, source.height / target.height);
+    animations.push(button.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(${stackLooks[index].angle}deg)`, opacity: .92 },
+      { transform: `translate(0, 0) scale(1) rotate(${angle})`, opacity: 1 },
+    ], { duration: 300 + index * 28, delay: index * 18, easing: 'cubic-bezier(.22,.75,.25,1)', fill: 'both' }));
+  });
+  Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+    animations.forEach((animation) => animation.cancel());
+    tileGrid.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
+  });
 }
 
-function closeTiles({ focus = true } = {}) {
+function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   if (view !== 'tiles') return;
-  tileView.classList.remove('is-active');
-  tileView.hidden = true;
-  tileView.setAttribute('aria-hidden', 'true');
-  chapters[activeIndex].inert = false;
-  updateControls('card');
-  if (focus) tileToggle.focus({ preventScroll: true });
+  jumpToCard(targetIndex);
+  const buttons = [...tileGrid.children];
+  const animations = [];
+  if (!reduceMotion.matches) {
+    buttons.forEach((button, index) => {
+      const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
+      if (index <= targetIndex) {
+        const source = button.getBoundingClientRect();
+        const target = cardFor(index).getBoundingClientRect();
+        const dx = target.left + target.width / 2 - (source.left + source.width / 2);
+        const dy = target.top + target.height / 2 - (source.top + source.height / 2);
+        const scale = Math.max(target.width / source.width, target.height / source.height);
+        animations.push(button.animate([
+          { transform: `translate(0, 0) scale(1) rotate(${angle})`, opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(${stackLooks[index].angle}deg)`, opacity: .9 },
+        ], { duration: 240 + (targetIndex - index) * 18, easing: 'cubic-bezier(.55,0,.78,.35)', fill: 'both' }));
+      } else {
+        animations.push(button.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 130, easing: 'ease-in-out', fill: 'both' }));
+      }
+    });
+  }
+  const finish = () => {
+    animations.forEach((animation) => animation.cancel());
+    tileView.classList.remove('is-active');
+    tileView.hidden = true;
+    tileView.setAttribute('aria-hidden', 'true');
+    updateControls('card');
+    if (focus) tileToggle.focus({ preventScroll: true });
+  };
+  if (!animations.length) finish();
+  else Promise.allSettled(animations.map((animation) => animation.finished)).then(finish);
 }
-
-chapters.forEach((chapter, index) => {
-  const title = chapter.querySelector('h2')?.textContent.trim() || '';
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'tile-card';
-  button.dataset.index = String(index);
-  button.innerHTML = `<span class="tile-number">#${String(index + 1).padStart(2, '0')}</span><span class="tile-title"></span>`;
-  button.querySelector('.tile-title').textContent = title;
-  button.setAttribute('aria-label', `${String(index + 1).padStart(2, '0')} ${title}へ移動`);
-  tileGrid.append(button);
-});
 
 tileToggle.addEventListener('click', openTiles);
 tileClose.addEventListener('click', () => closeTiles());
 tileGrid.addEventListener('click', (event) => {
   const button = event.target.closest('.tile-card');
   if (!button) return;
-  const index = Number(button.dataset.index);
-  closeTiles({ focus: false });
-  switchCard(index, { focus: true });
+  closeTiles(Number(button.dataset.index), { focus: false });
 });
 
 const faqItems = [...document.querySelectorAll('.faq-item')];
@@ -415,15 +582,20 @@ indexLinks.forEach((link) => {
   link.addEventListener('click', (event) => {
     event.preventDefault();
     menu.close();
-    if (link.hash === '#top') returnToTop(1);
-    else {
-      const index = chapters.findIndex((chapter) => `#${chapter.id}` === link.hash);
-      if (index >= 0) enterCard(index);
-    }
+    if (link.hash === '#top') return;
+    const index = chapters.findIndex((chapter) => `#${chapter.id}` === link.hash);
+    if (index < 0) return;
+    if (activeIndex >= 0 && stashSide) {
+      const side = stashSide;
+      jumpToCard(index);
+      stashSide = side;
+      cardStack.style.transform = `translateX(${side * bundleDistance()}px) rotate(${side * 2}deg)`;
+      restoreBundle();
+    } else enterStack(index);
   });
 });
 
-function resetWheel(commit = true) {
+function finishWheel(commit = true) {
   clearTimeout(wheelIdleTimer);
   const gesture = wheelGesture;
   wheelGesture = null;
@@ -437,21 +609,23 @@ function resetWheel(commit = true) {
     return;
   }
   gesture.used = true;
-  if (view === 'top' && gesture.axis === 'vertical' && gesture.direction > 0) {
-    enterCard(0);
+  if (view === 'top') {
+    if (stashSide && gesture.axis === 'horizontal' && -gesture.direction * stashSide < 0) restoreBundle();
+    else if (!stashSide && gesture.axis === 'vertical' && gesture.direction > 0) enterStack(0);
+    else if (preview) settlePreview();
     return;
   }
-  if (view !== 'card') {
-    if (preview) settlePreview();
-    return;
-  }
+  if (view !== 'card') return;
   if (gesture.axis === 'horizontal') {
-    returnToTop(-gesture.direction || 1);
+    stashBundle(-gesture.direction || 1);
     return;
   }
-  const nextIndex = activeIndex + gesture.direction;
-  if (nextIndex >= 0 && nextIndex < chapters.length) switchCard(nextIndex);
-  else if (preview) settlePreview();
+  if (gesture.direction > 0) addCard();
+  else removeCard();
+}
+
+function resetWheel(commit = true) {
+  finishWheel(commit);
 }
 
 window.addEventListener('wheel', (event) => {
@@ -463,105 +637,101 @@ window.addEventListener('wheel', (event) => {
   event.preventDefault();
   const axis = Math.abs(dx) > Math.abs(dy) * 1.08 ? 'horizontal' : 'vertical';
   const delta = axis === 'horizontal' ? dx : dy;
-  const now = performance.now();
   const direction = Math.sign(delta);
+  const now = performance.now();
   const previous = wheelGesture;
   const fresh = !previous || now - previous.lastAt > 150 || previous.axis !== axis || previous.direction !== direction;
   if (fresh) {
-    if (previous && preview) clearPreviewStyles();
-    wheelGesture = { axis, direction, lastAt: now, total: 0, used: false,
-      mode: axis === 'vertical' && view === 'card' && canReadFurther(direction) ? 'read' : 'switch' };
+    if (previous && preview) clearPreviewInstant();
+    wheelGesture = {
+      axis, direction, lastAt: now, total: 0, used: false,
+      mode: axis === 'vertical' && view === 'card' && canReadFurther(direction) ? 'read' : 'stack',
+    };
   }
   const gesture = wheelGesture;
   gesture.lastAt = now;
   clearTimeout(wheelIdleTimer);
-  wheelIdleTimer = setTimeout(() => resetWheel(true), 170);
+  wheelIdleTimer = setTimeout(() => finishWheel(true), 180);
   if (gesture.mode === 'read') {
     scrollCurrentCard(dy);
     return;
   }
-  if (gesture.used || transitioning) return;
+  if (transitioning) return;
   gesture.total += Math.abs(delta);
-
+  const distance = Math.min(gesture.total, (axis === 'horizontal' ? horizontalThreshold() : verticalThreshold()) * 1.08);
   if (view === 'top') {
-    if (axis !== 'vertical' || direction < 0) return;
-    beginTopPreview(Math.min(gesture.total, verticalThreshold() * 1.12));
+    if (stashSide && axis === 'horizontal') previewRestore(-direction * distance);
+    else if (!stashSide && axis === 'vertical' && direction > 0) {
+      activeIndex = -1;
+      previewNext(distance);
+    }
     return;
   }
   if (view !== 'card') return;
-  if (axis === 'horizontal') {
-    const offset = -direction * Math.min(gesture.total, horizontalThreshold() * 1.12);
-    followCard(offset, 0, 'horizontal');
-    return;
-  }
-  followCard(0, -direction * Math.min(gesture.total, verticalThreshold() * 1.12), 'vertical');
+  if (axis === 'horizontal') previewBundle(-direction * distance);
+  else if (direction > 0) previewNext(distance);
+  else previewPrevious(distance);
 }, { passive: false, capture: true });
 
 function startDrag(x, y, interactive) {
   resetWheel(false);
-  const gesture = { x, y, lastY: y, dx: 0, dy: 0, mode: null, interactive, held: false, holdTimer: null };
-  if (!interactive && view === 'card' && !transitioning) {
-    gesture.holdTimer = setTimeout(() => {
-      if (gesture.mode || transitioning || view !== 'card') return;
-      gesture.held = true;
-      followCard(0, 0, 'vertical');
-    }, holdDelay);
-  }
-  return gesture;
+  return { x, y, lastY: y, dx: 0, dy: 0, mode: null, interactive };
 }
 
 function moveDrag(gesture, x, y) {
-  if (!gesture || gesture.mode === 'committed' || transitioning) return;
+  if (!gesture || transitioning) return;
   const dx = x - gesture.x;
   const dy = y - gesture.y;
-  gesture.dx = dx;
-  gesture.dy = dy;
   const step = gesture.lastY - y;
   gesture.lastY = y;
+  gesture.dx = dx;
+  gesture.dy = dy;
   if (!gesture.mode && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
-    clearTimeout(gesture.holdTimer);
-    if (view === 'top') gesture.mode = 'top';
-    else if (view === 'card' && Math.abs(dx) > Math.abs(dy) * .82) gesture.mode = 'horizontal';
-    else if (view === 'card' && canReadFurther(dy < 0 ? 1 : -1) && !gesture.held) gesture.mode = 'read';
-    else gesture.mode = 'vertical';
+    if (view === 'top') {
+      if (stashSide && Math.abs(dx) > Math.abs(dy) * .8) gesture.mode = 'restore';
+      else if (!stashSide && Math.abs(dy) >= Math.abs(dx)) gesture.mode = 'enter';
+    } else if (view === 'card' && Math.abs(dx) > Math.abs(dy) * .82) gesture.mode = 'bundle';
+    else if (view === 'card' && canReadFurther(dy < 0 ? 1 : -1)) gesture.mode = 'read';
+    else if (view === 'card') gesture.mode = 'stack';
   }
   if (gesture.mode === 'read') scrollCurrentCard(step);
-  if (gesture.mode === 'top') {
-    beginTopPreview(Math.max(0, -dy));
-  }
-  if (gesture.mode === 'horizontal') {
-    followCard(dx, dy, 'horizontal');
-  }
-  if (gesture.mode === 'vertical') {
-    followCard(dx, dy, 'vertical');
+  else if (gesture.mode === 'enter') {
+    activeIndex = -1;
+    previewNext(Math.max(0, -dy));
+  } else if (gesture.mode === 'restore') previewRestore(dx);
+  else if (gesture.mode === 'bundle') previewBundle(dx);
+  else if (gesture.mode === 'stack') {
+    if (dy < 0) previewNext(-dy);
+    else previewPrevious(dy);
   }
 }
 
 function endDrag(gesture) {
   if (!gesture) return;
-  clearTimeout(gesture.holdTimer);
-  if (!gesture.mode) {
+  if (!gesture.mode || gesture.mode === 'read') {
     if (preview) settlePreview();
     return;
   }
-  if (gesture.mode === 'read') return;
-  suppressClickUntil = performance.now() + 320;
-  if (gesture.mode === 'top' && -gesture.dy >= verticalThreshold()) {
-    gesture.mode = 'committed';
-    enterCard(0);
+  suppressClickUntil = performance.now() + 340;
+  if (gesture.mode === 'enter' && -gesture.dy >= verticalThreshold()) {
+    enterStack(0);
     return;
   }
-  if (gesture.mode === 'horizontal' && Math.abs(gesture.dx) >= horizontalThreshold()) {
-    gesture.mode = 'committed';
-    returnToTop(Math.sign(gesture.dx) || 1);
+  if (gesture.mode === 'restore' && gesture.dx * stashSide < 0 && Math.abs(gesture.dx) >= horizontalThreshold()) {
+    restoreBundle();
     return;
   }
-  if (gesture.mode === 'vertical' && Math.abs(gesture.dy) >= verticalThreshold()) {
-    const direction = gesture.dy < 0 ? 1 : -1;
-    const nextIndex = activeIndex + direction;
-    if (nextIndex >= 0 && nextIndex < chapters.length) {
-      gesture.mode = 'committed';
-      switchCard(nextIndex);
+  if (gesture.mode === 'bundle' && Math.abs(gesture.dx) >= horizontalThreshold()) {
+    stashBundle(Math.sign(gesture.dx) || 1);
+    return;
+  }
+  if (gesture.mode === 'stack' && Math.abs(gesture.dy) >= verticalThreshold()) {
+    if (gesture.dy < 0 && activeIndex < chapters.length - 1) {
+      addCard();
+      return;
+    }
+    if (gesture.dy > 0 && activeIndex > 0) {
+      removeCard();
       return;
     }
   }
@@ -588,7 +758,7 @@ deck.addEventListener('touchend', (event) => {
   touchGesture = null;
 }, { passive: false });
 deck.addEventListener('touchcancel', () => {
-  endDrag(touchGesture);
+  if (preview) settlePreview();
   touchGesture = null;
 }, { passive: true });
 
@@ -609,12 +779,14 @@ deck.addEventListener('pointerup', (event) => {
   pointerGesture = null;
   if (deck.hasPointerCapture(event.pointerId)) deck.releasePointerCapture(event.pointerId);
 });
-function cancelPointerDrag() {
-  endDrag(pointerGesture);
+deck.addEventListener('pointercancel', () => {
+  if (preview) settlePreview();
   pointerGesture = null;
-}
-deck.addEventListener('pointercancel', cancelPointerDrag);
-deck.addEventListener('lostpointercapture', cancelPointerDrag);
+});
+deck.addEventListener('lostpointercapture', () => {
+  if (pointerGesture && preview) settlePreview();
+  pointerGesture = null;
+});
 deck.addEventListener('contextmenu', (event) => {
   if (!event.target.closest('a, button, summary')) event.preventDefault();
 });
@@ -624,13 +796,6 @@ deck.addEventListener('click', (event) => {
     event.stopImmediatePropagation();
   }
 }, true);
-
-window.addEventListener('blur', () => {
-  endDrag(touchGesture);
-  touchGesture = null;
-  cancelPointerDrag();
-  resetWheel(false);
-});
 
 window.addEventListener('keydown', (event) => {
   if (menu.open || event.altKey || event.ctrlKey || event.metaKey ||
@@ -642,48 +807,58 @@ window.addEventListener('keydown', (event) => {
     }
     return;
   }
-  if (view === 'top' && ['ArrowDown', 'PageDown', ' '].includes(event.key)) {
-    event.preventDefault();
-    if (!event.repeat) enterCard(0);
+  if (view === 'top') {
+    if (!stashSide && ['ArrowDown', 'PageDown', ' '].includes(event.key)) {
+      event.preventDefault();
+      if (!event.repeat) enterStack(0);
+    } else if (stashSide && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.preventDefault();
+      if (!event.repeat) restoreBundle();
+    }
     return;
   }
   if (view !== 'card') return;
-  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Escape' || event.key === 'Home') {
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Escape') {
     event.preventDefault();
-    if (!event.repeat) returnToTop(event.key === 'ArrowLeft' ? -1 : 1);
+    if (!event.repeat) stashBundle(event.key === 'ArrowLeft' ? -1 : 1);
     return;
   }
   const direction = ['ArrowDown', 'PageDown', ' '].includes(event.key) ? 1 : ['ArrowUp', 'PageUp'].includes(event.key) ? -1 : 0;
   if (!direction) return;
   event.preventDefault();
-  if (canReadFurther(direction)) {
-    const distance = event.key.startsWith('Arrow') ? 48 : deck.clientHeight * .72;
-    scrollCurrentCard(direction * distance);
-  } else if (!event.repeat) {
-    switchCard(activeIndex + direction);
-  }
+  if (canReadFurther(direction)) scrollCurrentCard(direction * (event.key.startsWith('Arrow') ? 48 : deck.clientHeight * .72));
+  else if (!event.repeat) direction > 0 ? addCard() : removeCard();
 });
 
 function syncFromHash() {
   cancelTransition();
-  clearPreviewStyles();
-  const index = chapters.findIndex((chapter) => `#${chapter.id}` === location.hash);
-  chapters.forEach((_, chapterIndex) => hideChapterElement(chapterIndex));
+  preview = null;
   tileView.hidden = true;
   tileView.classList.remove('is-active');
   tileView.setAttribute('aria-hidden', 'true');
+  const index = chapters.findIndex((chapter) => `#${chapter.id}` === location.hash);
   if (index < 0) {
     activeIndex = -1;
-    hero.style.removeProperty('opacity');
+    stashSide = 0;
+    chapters.forEach((_, chapterIndex) => hideChapter(chapterIndex));
+    cardStack.style.transform = 'none';
+    hero.style.opacity = '1';
     updateControls('top');
   } else {
     activeIndex = index;
-    showChapterElement(index);
+    stashSide = 0;
+    renderStack(index);
+    cardStack.style.transform = 'none';
     hero.style.opacity = '0';
     updateControls('card');
   }
-  updateCurrentLinks();
 }
 
 window.addEventListener('hashchange', syncFromHash);
+window.addEventListener('blur', () => {
+  resetWheel(false);
+  if (preview) settlePreview();
+  touchGesture = null;
+  pointerGesture = null;
+});
 syncFromHash();
