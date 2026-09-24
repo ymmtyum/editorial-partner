@@ -154,6 +154,7 @@ function cancelTransition() {
   runningAnimations.forEach((animation) => animation.cancel());
   runningAnimations = [];
   cardStack.classList.remove('is-morph-source');
+  tileView.classList.remove('is-morphing');
   tileGrid?.querySelectorAll('.is-morphing').forEach((button) => button.classList.remove('is-morphing'));
   transitionVersion += 1;
   transitioning = false;
@@ -892,6 +893,24 @@ function cardMorphBounds(index) {
   };
 }
 
+function lockTileFaces() {
+  const sample = cardFor(Math.max(activeIndex, 0));
+  if (!sample) return;
+  const width = `${sample.offsetWidth}px`;
+  const height = `${sample.offsetHeight}px`;
+  tileGrid.querySelectorAll('.tile-face').forEach((face) => {
+    face.style.setProperty('--face-w', width);
+    face.style.setProperty('--face-h', height);
+  });
+}
+
+function morphTransform(dx, dy, sx, sy, angle) {
+  return {
+    button: `translate3d(${dx}px, ${dy}px, 0) scale(${sx}, ${sy}) rotate(${angle}deg)`,
+    face: `translateX(-50%) scale(${1 / sx}, ${1 / sy})`,
+  };
+}
+
 function openTiles() {
   if (view !== 'card' || transitioning || activeIndex < 0) return;
   const version = ++transitionVersion;
@@ -901,14 +920,15 @@ function openTiles() {
   const sourceBounds = chapters.map((_, index) => index <= activeIndex ? cardMorphBounds(index) : null);
   cardStack.classList.add('is-morph-source');
   tileView.hidden = false;
-  tileView.classList.add('is-active');
+  tileView.classList.add('is-active', 'is-morphing');
   tileView.setAttribute('aria-hidden', 'false');
   updateControls('tiles');
+  lockTileFaces();
   const buttons = [...tileGrid.children];
   const animations = [];
   buttons.forEach((button, index) => {
     button.getAnimations().forEach((animation) => animation.cancel());
-    const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
+    const angle = parseFloat(button.style.getPropertyValue('--tile-angle')) || 0;
     if (reduceMotion.matches) return;
     if (index > activeIndex) {
       animations.push(button.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, delay: 90, easing: 'ease-out', fill: 'both' }));
@@ -917,17 +937,24 @@ function openTiles() {
     button.classList.add('is-morphing');
     const source = sourceBounds[index];
     const target = button.getBoundingClientRect();
-    animations.push(button.animate([
-      { left: `${source.left}px`, top: `${source.top}px`, width: `${source.width}px`, height: `${source.height}px`, transform: `rotate(${restingAngle(index)}deg)` },
-      { left: `${target.left}px`, top: `${target.top}px`, width: `${target.width}px`, height: `${target.height}px`, transform: `rotate(${angle})` },
-    ], { duration: 460 + index * 24, delay: index * 16, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' }));
+    const sx = source.width / target.width;
+    const sy = source.height / target.height;
+    const dx = (source.left + source.width / 2) - (target.left + target.width / 2);
+    const dy = (source.top + source.height / 2) - (target.top + target.height / 2);
+    const face = button.querySelector('.tile-face');
+    const from = morphTransform(dx, dy, sx, sy, restingAngle(index));
+    const to = morphTransform(0, 0, 1, 1, angle);
+    const timing = { duration: 460 + index * 24, delay: index * 16, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' };
+    animations.push(button.animate([{ transform: from.button }, { transform: to.button }], timing));
+    animations.push(face.animate([{ transform: from.face }, { transform: to.face }], timing));
   });
   runningAnimations = animations;
   Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
     if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
     runningAnimations = [];
-    tileGrid.querySelectorAll('.is-morphing').forEach((button) => button.classList.remove('is-morphing'));
+    tileGrid.querySelectorAll('.is-morphing').forEach((node) => node.classList.remove('is-morphing'));
+    tileView.classList.remove('is-morphing');
     cardStack.classList.remove('is-morph-source');
     transitioning = false;
     tileGrid.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
@@ -942,18 +969,26 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   const tileBounds = buttons.map((button) => button.getBoundingClientRect());
   jumpToCard(targetIndex);
   cardStack.classList.add('is-morph-source');
+  tileView.classList.add('is-morphing');
+  lockTileFaces();
   const animations = [];
   if (!reduceMotion.matches) {
     buttons.forEach((button, index) => {
-      const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
+      const angle = parseFloat(button.style.getPropertyValue('--tile-angle')) || 0;
       if (index <= targetIndex) {
         button.classList.add('is-morphing');
         const source = tileBounds[index];
         const target = cardMorphBounds(index);
-        animations.push(button.animate([
-          { left: `${source.left}px`, top: `${source.top}px`, width: `${source.width}px`, height: `${source.height}px`, transform: `rotate(${angle})` },
-          { left: `${target.left}px`, top: `${target.top}px`, width: `${target.width}px`, height: `${target.height}px`, transform: `rotate(${restingAngle(index)}deg)` },
-        ], { duration: 420 + (targetIndex - index) * 20, delay: (targetIndex - index) * 12, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' }));
+        const sx = target.width / source.width;
+        const sy = target.height / source.height;
+        const dx = (target.left + target.width / 2) - (source.left + source.width / 2);
+        const dy = (target.top + target.height / 2) - (source.top + source.height / 2);
+        const face = button.querySelector('.tile-face');
+        const from = morphTransform(0, 0, 1, 1, angle);
+        const to = morphTransform(dx, dy, sx, sy, restingAngle(index));
+        const timing = { duration: 420 + (targetIndex - index) * 20, delay: (targetIndex - index) * 12, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' };
+        animations.push(button.animate([{ transform: from.button }, { transform: to.button }], timing));
+        animations.push(face.animate([{ transform: from.face }, { transform: to.face }], timing));
       } else {
         animations.push(button.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 130, easing: 'ease-in-out', fill: 'both' }));
       }
@@ -965,6 +1000,7 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
     animations.forEach((animation) => animation.cancel());
     runningAnimations = [];
     buttons.forEach((button) => button.classList.remove('is-morphing'));
+    tileView.classList.remove('is-morphing');
     cardStack.classList.remove('is-morph-source');
     tileView.classList.remove('is-active');
     tileView.hidden = true;
