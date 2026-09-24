@@ -947,19 +947,34 @@ window.addEventListener('wheel', (event) => {
   }
   const gesture = wheelGesture;
   gesture.lastAt = performance.now();
+  gesture.sumX = (gesture.sumX || 0) + dx;
+  gesture.sumY = (gesture.sumY || 0) + dy;
   clearTimeout(wheelIdleTimer);
   wheelIdleTimer = setTimeout(() => finishWheel(true), 180);
   if (gesture.mode === 'read') {
     scrollCurrentCard(dy);
     if (direction && !canReadFurther(direction)) {
       gesture.mode = 'drag';
+      gesture.axis = 'y';
+      gesture.lockedApplied = true;
       captureLivePose();
       tracking = true;
+      return;
     } else return;
   }
+  if (!gesture.axis) {
+    if (Math.hypot(gesture.sumX, gesture.sumY) < 8) return;
+    gesture.axis = Math.abs(gesture.sumY) >= Math.abs(gesture.sumX) ? 'y' : 'x';
+  }
   const limits = dragLimits();
-  pose.x = rubber(pose.x - dx, limits.minX, limits.maxX);
-  pose.y = rubber(pose.y - dy, limits.minY, limits.maxY);
+  if (!gesture.lockedApplied) {
+    gesture.lockedApplied = true;
+    pose.x = rubber(pose.x - (gesture.axis === 'y' ? 0 : gesture.sumX), limits.minX, limits.maxX);
+    pose.y = rubber(pose.y - gesture.sumY, limits.minY, limits.maxY);
+  } else {
+    pose.x = rubber(pose.x - (gesture.axis === 'y' ? 0 : dx), limits.minX, limits.maxX);
+    pose.y = rubber(pose.y - dy, limits.minY, limits.maxY);
+  }
   gesture.moved = true;
   tracking = true;
   notePose();
@@ -985,6 +1000,7 @@ function moveDrag(gesture, x, y) {
     const continued = Math.sign(-rawY);
     if (continued && continued === gesture.boundaryDirection) {
       gesture.mode = 'drag';
+      gesture.axis = 'y';
       gesture.originX = x;
       gesture.originY = y;
       gesture.baseX = pose.x;
@@ -997,6 +1013,7 @@ function moveDrag(gesture, x, y) {
   }
   if (!gesture.mode && Math.hypot(rawX, rawY) > 6) {
     const vertical = Math.abs(rawY) >= Math.abs(rawX);
+    gesture.axis = vertical ? 'y' : 'x';
     const readDirection = rawY < 0 ? 1 : -1;
     gesture.mode = view === 'card' && vertical && canReadFurther(readDirection) ? 'read' : 'drag';
     if (gesture.mode === 'drag') tracking = true;
@@ -1016,7 +1033,8 @@ function moveDrag(gesture, x, y) {
   }
   if (gesture.mode !== 'drag') return;
   const limits = dragLimits();
-  pose.x = rubber(gesture.baseX + (x - gesture.originX), limits.minX, limits.maxX);
+  const dragX = gesture.axis === 'y' ? 0 : x - gesture.originX;
+  pose.x = rubber(gesture.baseX + dragX, limits.minX, limits.maxX);
   pose.y = rubber(gesture.baseY + (y - gesture.originY), limits.minY, limits.maxY);
   tracking = true;
   notePose();
