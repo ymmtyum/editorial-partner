@@ -25,11 +25,11 @@ let suppressClickUntil = 0;
 const holdDelay = 150;
 
 function verticalThreshold() {
-  return Math.max(66, Math.min(104, deck.clientHeight * 0.12));
+  return Math.max(110, Math.min(180, deck.clientHeight * 0.2));
 }
 
 function horizontalThreshold() {
-  return Math.max(82, Math.min(150, deck.clientWidth * 0.18));
+  return Math.max(130, Math.min(240, deck.clientWidth * 0.24));
 }
 
 function cardFor(index) {
@@ -334,7 +334,7 @@ function scrollCurrentCard(delta) {
 
 function openTiles() {
   if (view !== 'card' || transitioning) return;
-  resetWheel();
+  resetWheel(false);
   tileView.hidden = false;
   tileView.setAttribute('aria-hidden', 'false');
   chapters[activeIndex].inert = true;
@@ -383,8 +383,18 @@ tileGrid.addEventListener('click', (event) => {
   switchCard(index, { focus: true });
 });
 
+const faqItems = [...document.querySelectorAll('.faq-item')];
+faqItems.forEach((item) => {
+  item.addEventListener('toggle', () => {
+    if (!item.open) return;
+    faqItems.forEach((other) => {
+      if (other !== item && other.open) other.open = false;
+    });
+  });
+});
+
 menuToggle.addEventListener('click', () => {
-  resetWheel();
+  resetWheel(false);
   menu.showModal();
   menuToggle.setAttribute('aria-expanded', 'true');
 });
@@ -413,10 +423,35 @@ indexLinks.forEach((link) => {
   });
 });
 
-function resetWheel() {
+function resetWheel(commit = true) {
   clearTimeout(wheelIdleTimer);
+  const gesture = wheelGesture;
   wheelGesture = null;
-  if (preview) settlePreview();
+  if (!gesture || gesture.mode === 'read' || gesture.used || !commit) {
+    if (preview) settlePreview();
+    return;
+  }
+  const threshold = gesture.axis === 'horizontal' ? horizontalThreshold() : verticalThreshold();
+  if (gesture.total < threshold) {
+    if (preview) settlePreview();
+    return;
+  }
+  gesture.used = true;
+  if (view === 'top' && gesture.axis === 'vertical' && gesture.direction > 0) {
+    enterCard(0);
+    return;
+  }
+  if (view !== 'card') {
+    if (preview) settlePreview();
+    return;
+  }
+  if (gesture.axis === 'horizontal') {
+    returnToTop(-gesture.direction || 1);
+    return;
+  }
+  const nextIndex = activeIndex + gesture.direction;
+  if (nextIndex >= 0 && nextIndex < chapters.length) switchCard(nextIndex);
+  else if (preview) settlePreview();
 }
 
 window.addEventListener('wheel', (event) => {
@@ -433,13 +468,14 @@ window.addEventListener('wheel', (event) => {
   const previous = wheelGesture;
   const fresh = !previous || now - previous.lastAt > 150 || previous.axis !== axis || previous.direction !== direction;
   if (fresh) {
+    if (previous && preview) clearPreviewStyles();
     wheelGesture = { axis, direction, lastAt: now, total: 0, used: false,
       mode: axis === 'vertical' && view === 'card' && canReadFurther(direction) ? 'read' : 'switch' };
   }
   const gesture = wheelGesture;
   gesture.lastAt = now;
   clearTimeout(wheelIdleTimer);
-  wheelIdleTimer = setTimeout(resetWheel, 170);
+  wheelIdleTimer = setTimeout(() => resetWheel(true), 170);
   if (gesture.mode === 'read') {
     scrollCurrentCard(dy);
     return;
@@ -449,35 +485,21 @@ window.addEventListener('wheel', (event) => {
 
   if (view === 'top') {
     if (axis !== 'vertical' || direction < 0) return;
-    beginTopPreview(Math.min(gesture.total, verticalThreshold()));
-    if (gesture.total >= verticalThreshold()) {
-      gesture.used = true;
-      enterCard(0);
-    }
+    beginTopPreview(Math.min(gesture.total, verticalThreshold() * 1.12));
     return;
   }
   if (view !== 'card') return;
   if (axis === 'horizontal') {
-    const offset = -direction * Math.min(gesture.total, horizontalThreshold());
+    const offset = -direction * Math.min(gesture.total, horizontalThreshold() * 1.12);
     followCard(offset, 0, 'horizontal');
-    if (gesture.total >= horizontalThreshold()) {
-      gesture.used = true;
-      returnToTop(Math.sign(offset) || 1);
-    }
     return;
   }
-  const nextIndex = activeIndex + direction;
-  followCard(0, -direction * Math.min(gesture.total, verticalThreshold()), 'vertical');
-  if (gesture.total >= verticalThreshold()) {
-    gesture.used = true;
-    if (nextIndex >= 0 && nextIndex < chapters.length) switchCard(nextIndex);
-    else settlePreview();
-  }
+  followCard(0, -direction * Math.min(gesture.total, verticalThreshold() * 1.12), 'vertical');
 }, { passive: false, capture: true });
 
 function startDrag(x, y, interactive) {
-  resetWheel();
-  const gesture = { x, y, lastY: y, mode: null, interactive, held: false, holdTimer: null };
+  resetWheel(false);
+  const gesture = { x, y, lastY: y, dx: 0, dy: 0, mode: null, interactive, held: false, holdTimer: null };
   if (!interactive && view === 'card' && !transitioning) {
     gesture.holdTimer = setTimeout(() => {
       if (gesture.mode || transitioning || view !== 'card') return;
@@ -492,6 +514,8 @@ function moveDrag(gesture, x, y) {
   if (!gesture || gesture.mode === 'committed' || transitioning) return;
   const dx = x - gesture.x;
   const dy = y - gesture.y;
+  gesture.dx = dx;
+  gesture.dy = dy;
   const step = gesture.lastY - y;
   gesture.lastY = y;
   if (!gesture.mode && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
@@ -504,36 +528,44 @@ function moveDrag(gesture, x, y) {
   if (gesture.mode === 'read') scrollCurrentCard(step);
   if (gesture.mode === 'top') {
     beginTopPreview(Math.max(0, -dy));
-    if (-dy >= verticalThreshold()) {
-      gesture.mode = 'committed';
-      suppressClickUntil = performance.now() + 320;
-      enterCard(0);
-    }
   }
   if (gesture.mode === 'horizontal') {
     followCard(dx, dy, 'horizontal');
-    if (Math.abs(dx) >= horizontalThreshold()) {
-      gesture.mode = 'committed';
-      suppressClickUntil = performance.now() + 320;
-      returnToTop(Math.sign(dx) || 1);
-    }
   }
   if (gesture.mode === 'vertical') {
     followCard(dx, dy, 'vertical');
-    const direction = dy < 0 ? 1 : -1;
-    if (Math.abs(dy) >= verticalThreshold() && activeIndex + direction >= 0 && activeIndex + direction < chapters.length) {
-      gesture.mode = 'committed';
-      suppressClickUntil = performance.now() + 320;
-      switchCard(activeIndex + direction);
-    }
   }
 }
 
 function endDrag(gesture) {
   if (!gesture) return;
   clearTimeout(gesture.holdTimer);
-  if (gesture.mode && gesture.mode !== 'committed') suppressClickUntil = performance.now() + 320;
-  if (gesture.mode !== 'committed') settlePreview();
+  if (!gesture.mode) {
+    if (preview) settlePreview();
+    return;
+  }
+  if (gesture.mode === 'read') return;
+  suppressClickUntil = performance.now() + 320;
+  if (gesture.mode === 'top' && -gesture.dy >= verticalThreshold()) {
+    gesture.mode = 'committed';
+    enterCard(0);
+    return;
+  }
+  if (gesture.mode === 'horizontal' && Math.abs(gesture.dx) >= horizontalThreshold()) {
+    gesture.mode = 'committed';
+    returnToTop(Math.sign(gesture.dx) || 1);
+    return;
+  }
+  if (gesture.mode === 'vertical' && Math.abs(gesture.dy) >= verticalThreshold()) {
+    const direction = gesture.dy < 0 ? 1 : -1;
+    const nextIndex = activeIndex + direction;
+    if (nextIndex >= 0 && nextIndex < chapters.length) {
+      gesture.mode = 'committed';
+      switchCard(nextIndex);
+      return;
+    }
+  }
+  settlePreview();
 }
 
 deck.addEventListener('touchstart', (event) => {
@@ -597,7 +629,7 @@ window.addEventListener('blur', () => {
   endDrag(touchGesture);
   touchGesture = null;
   cancelPointerDrag();
-  resetWheel();
+  resetWheel(false);
 });
 
 window.addEventListener('keydown', (event) => {

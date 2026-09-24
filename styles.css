@@ -78,8 +78,10 @@ main { touch-action: pinch-zoom; }
 .pain-list, .type-list, .numbered { padding-left: 22px; }
 .pain-list li, .type-list li, .numbered li { margin-bottom: 16px; }
 .case-links { display: grid; gap: 12px; margin-bottom: 26px; }
-.case-link { display: grid; gap: 6px; padding: 20px; background: #e9ece2; border: 1px solid var(--line); border-radius: 3px; text-decoration: none; }
-.case-link:hover { border-color: #778554; }
+.case-link { display: grid; grid-template-columns: minmax(170px, .8fr) minmax(0, 1.2fr); background: #e9ece2; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; text-decoration: none; transition: border-color 160ms ease-in-out, transform 160ms ease-in-out; }
+.case-link:hover { border-color: #778554; transform: translateY(-2px); }
+.case-image { display: block; width: 100%; height: 100%; min-height: 150px; object-fit: cover; }
+.case-copy { display: grid; align-content: center; gap: 8px; padding: 20px; }
 .case-kicker, .case-url { font-size: 11px; color: var(--muted); }
 .case-title { font-weight: 700; line-height: 1.6; }
 .callout { display: flex; gap: 12px; padding: 18px; background: #eeefe6; }
@@ -97,7 +99,8 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
 .faq-item summary::after { content: "+"; position: absolute; top: 20px; right: 4px; font: 24px/1.2 Arial, sans-serif; }
 .faq-item[open] summary::after { content: "−"; }
 .faq-item summary:hover { color: #557040; }
-.faq-answer { padding: 0 24px 24px 0; }
+.faq-answer { display: block !important; max-height: 0; padding: 0 24px 0 0; overflow: hidden; opacity: 0; transform: translateY(-6px); transition: max-height 260ms ease-in-out, opacity 180ms ease-in-out, transform 220ms ease-in-out, padding 220ms ease-in-out; }
+.faq-item[open] .faq-answer { max-height: 1600px; padding-bottom: 24px; opacity: 1; transform: translateY(0); }
 
 @media (max-width: 600px) {
   .hero { padding: 56px 24px 94px; gap: 22px; }
@@ -112,6 +115,8 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
   .menu-dialog { padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
   .index-link { padding: 17px 0; font-size: 13px; }
   .profile { grid-template-columns: 1fr; }
+  .case-link { grid-template-columns: 1fr; }
+  .case-image { aspect-ratio: 1.91 / 1; min-height: 0; }
 }
 @media (max-height: 540px) and (min-width: 601px) {
   .hero { flex-direction: row-reverse; gap: 64px; padding: 40px 80px; }
