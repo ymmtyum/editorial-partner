@@ -184,6 +184,7 @@ main.is-dragging { -webkit-user-select: none; }
 
 /* The top page stays beneath the card deck and is revealed when a card is
    physically moved aside. */
+.build-tag { position: fixed; left: 8px; bottom: 6px; z-index: 30; font: 10px/1 ui-monospace, monospace; letter-spacing: .04em; color: #8a9088; pointer-events: none; }
 [hidden] { display: none !important; }
 .hero {
   z-index: 0 !important;
