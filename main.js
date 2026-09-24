@@ -57,8 +57,10 @@ chapters.forEach((chapter, index) => {
   button.type = 'button';
   button.className = 'tile-card';
   button.dataset.index = String(index);
-  button.innerHTML = `<span class="card-meta"><span class="card-number">${String(index + 1).padStart(2, '0')}</span></span><span class="tile-card-copy"><span class="tile-heading"></span></span>`;
-  button.querySelector('.tile-heading').textContent = title;
+  const face = chapter.querySelector('.story-card').cloneNode(true);
+  face.classList.add('tile-face');
+  face.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
+  button.append(face);
   button.setAttribute('aria-label', `${String(index + 1).padStart(2, '0')} ${title}へ移動`);
   tileGrid.append(button);
 });
@@ -148,6 +150,7 @@ function cancelTransition() {
   runningAnimations.forEach((animation) => animation.cancel());
   runningAnimations = [];
   cardStack.classList.remove('is-morph-source');
+  tileGrid?.querySelectorAll('.is-morphing').forEach((button) => button.classList.remove('is-morphing'));
   transitionVersion += 1;
   transitioning = false;
 }
@@ -187,8 +190,8 @@ function dragLimits() {
   if (onTop && stashSide) {
     const base = stashSide * bundleDistance();
     return stashSide > 0
-      ? { minX: 0, maxX: base, minY: 0, maxY: 0 }
-      : { minX: base, maxX: 0, minY: 0, maxY: 0 };
+      ? { minX: 0, maxX: base, minY: -Infinity, maxY: 0 }
+      : { minX: base, maxX: 0, minY: -Infinity, maxY: 0 };
   }
   return {
     minX: -Infinity,
@@ -219,6 +222,26 @@ function poseVelocity() {
   return { x: (last.x - first.x) / dt, y: (last.y - first.y) / dt };
 }
 
+function risingCard() {
+  return chapters[0].querySelector('.story-card') || deck.querySelector(':scope > .story-card');
+}
+
+function placeRisingCard(y) {
+  const card = risingCard();
+  if (!card) return;
+  if (card.parentElement !== deck) deck.append(card);
+  card.classList.add('is-rising');
+  card.style.setProperty('--drag-y', `${cardTravel() + y}px`);
+}
+
+function clearRisingCard() {
+  const card = deck.querySelector(':scope > .story-card');
+  if (!card) return;
+  card.classList.remove('is-rising');
+  card.style.removeProperty('--drag-y');
+  chapters[0].append(card);
+}
+
 function clearCardDrag(index) {
   const card = cardFor(index);
   if (!card) return;
@@ -235,8 +258,11 @@ function applyPose() {
   cardStack.classList.toggle('is-held', tracking && (Math.abs(pose.x) > 0.5 || Math.abs(pose.y) > 0.5));
   deck.classList.toggle('is-dragging', tracking);
 
+  const restarting = view === 'top' && stashSide && pose.y < -0.5;
+  if (restarting) placeRisingCard(pose.y);
+  else clearRisingCard();
   const nextIndex = activeIndex + 1;
-  const showNext = pose.y < -0.5 && nextIndex < chapters.length && nextIndex >= 0;
+  const showNext = !restarting && pose.y < -0.5 && nextIndex < chapters.length && nextIndex >= 0;
   if (showNext) {
     const chapter = chapters[nextIndex];
     chapter.classList.add('is-preview');
@@ -261,7 +287,7 @@ function applyPose() {
   }
 
   const onTop = view === 'top' && !stashSide;
-  hero.style.opacity = onTop
+  hero.style.opacity = onTop || restarting
     ? String(Math.max(0, 1 - Math.min(1, -pose.y / travel)))
     : String(Math.min(1, Math.abs(pose.x) / bundleDistance()));
 }
@@ -369,7 +395,11 @@ function releasePose(velocity = poseVelocity()) {
       action = 'stash';
     }
   } else if (yScore > xScore && shouldCommit(yDelta, velocity.y, travel)) {
-    if (yDelta < 0 && activeIndex + 1 < chapters.length) {
+    if (view === 'top' && stashSide && yDelta < 0) {
+      targetX = rest.x;
+      targetY = -travel;
+      action = 'restart';
+    } else if (yDelta < 0 && activeIndex + 1 < chapters.length) {
       targetY = -travel;
       action = activeIndex < 0 ? 'enter' : 'next';
     } else if (yDelta > 0 && activeIndex > 0) {
@@ -384,7 +414,7 @@ function finishPose(action, targetX) {
   tracking = false;
   deck.classList.remove('is-dragging');
   cardStack.classList.remove('is-held');
-  if (action === 'enter') commitEnteredCard();
+  if (action === 'enter' || action === 'restart') commitEnteredCard();
   else if (action === 'next') commitNextCard();
   else if (action === 'prev') commitPreviousCard();
   else if (action === 'stash') commitStash(Math.sign(targetX) || 1);
@@ -397,6 +427,7 @@ function finishPose(action, targetX) {
       shownNext = -1;
     }
     if (activeIndex >= 0) clearCardDrag(activeIndex);
+    clearRisingCard();
     applyPose();
     deck.classList.remove('is-dragging');
     cardStack.classList.remove('is-held');
@@ -406,6 +437,7 @@ function finishPose(action, targetX) {
 }
 
 function commitEnteredCard() {
+  clearRisingCard();
   clearCardDrag(0);
   shownNext = -1;
   pose = { x: 0, y: 0 };
@@ -414,6 +446,7 @@ function commitEnteredCard() {
   cardStack.classList.remove('is-held');
   activeIndex = 0;
   stashSide = 0;
+  cardStack.classList.remove('is-aligned');
   renderStack(0);
   hero.style.opacity = '0';
   setHash(chapters[0].id);
@@ -429,6 +462,7 @@ function commitNextCard() {
   shownNext = -1;
   chapters[activeIndex].classList.remove('is-active');
   chapters[activeIndex].classList.add('is-stacked');
+  cardStack.classList.remove('is-aligned');
   incoming.classList.remove('is-preview');
   incoming.classList.add('is-active');
   cardScrollFor(index).scrollTop = 0;
@@ -856,22 +890,20 @@ function openTiles() {
       animations.push(button.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, delay: 90, easing: 'ease-out', fill: 'both' }));
       return;
     }
+    button.classList.add('is-morphing');
     const source = sourceBounds[index];
     const target = button.getBoundingClientRect();
-    const dx = source.left + source.width / 2 - (target.left + target.width / 2);
-    const dy = source.top + source.height / 2 - (target.top + target.height / 2);
-    const scaleX = source.width / target.width;
-    const scaleY = source.height / target.height;
     animations.push(button.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY}) rotate(${restingAngle(index)}deg)`, borderRadius: '3px' },
-      { transform: `translate(0, 0) scale(1, 1) rotate(${angle})`, borderRadius: '5px' },
-    ], { duration: 420 + index * 28, delay: index * 18, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' }));
+      { left: `${source.left}px`, top: `${source.top}px`, width: `${source.width}px`, height: `${source.height}px`, transform: `rotate(${restingAngle(index)}deg)` },
+      { left: `${target.left}px`, top: `${target.top}px`, width: `${target.width}px`, height: `${target.height}px`, transform: `rotate(${angle})` },
+    ], { duration: 460 + index * 24, delay: index * 16, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' }));
   });
   runningAnimations = animations;
   Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
     if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
     runningAnimations = [];
+    tileGrid.querySelectorAll('.is-morphing').forEach((button) => button.classList.remove('is-morphing'));
     cardStack.classList.remove('is-morph-source');
     transitioning = false;
     tileGrid.querySelector('.tile-card[aria-current="true"]')?.focus({ preventScroll: true });
@@ -891,16 +923,13 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
     buttons.forEach((button, index) => {
       const angle = button.style.getPropertyValue('--tile-angle') || '0deg';
       if (index <= targetIndex) {
+        button.classList.add('is-morphing');
         const source = tileBounds[index];
         const target = cardMorphBounds(index);
-        const dx = source.left + source.width / 2 - (target.left + target.width / 2);
-        const dy = source.top + source.height / 2 - (target.top + target.height / 2);
-        const scaleX = target.width / source.width;
-        const scaleY = target.height / source.height;
         animations.push(button.animate([
-          { transform: `translate(0, 0) scale(1, 1) rotate(${angle})`, borderRadius: '5px', opacity: 1 },
-          { transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY}) rotate(${restingAngle(index)}deg)`, borderRadius: '3px', opacity: 1 },
-        ], { duration: 340 + (targetIndex - index) * 22, delay: (targetIndex - index) * 12, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' }));
+          { left: `${source.left}px`, top: `${source.top}px`, width: `${source.width}px`, height: `${source.height}px`, transform: `rotate(${angle})` },
+          { left: `${target.left}px`, top: `${target.top}px`, width: `${target.width}px`, height: `${target.height}px`, transform: `rotate(${restingAngle(index)}deg)` },
+        ], { duration: 420 + (targetIndex - index) * 20, delay: (targetIndex - index) * 12, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'both' }));
       } else {
         animations.push(button.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 130, easing: 'ease-in-out', fill: 'both' }));
       }
@@ -911,6 +940,7 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
     if (version !== transitionVersion) return;
     animations.forEach((animation) => animation.cancel());
     runningAnimations = [];
+    buttons.forEach((button) => button.classList.remove('is-morphing'));
     cardStack.classList.remove('is-morph-source');
     tileView.classList.remove('is-active');
     tileView.hidden = true;
