@@ -195,7 +195,7 @@ main.is-dragging { -webkit-user-select: none; }
 }
 body[data-view="top"] .hero { pointer-events: auto; }
 .chapter { z-index: 2; will-change: transform; }
-.card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform-origin: 50% 55%; will-change: transform; }
+.card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translateX(var(--bundle-x, 0px)) rotate(var(--bundle-rot, 0deg)); transform-origin: 50% 55%; will-change: transform; }
 .chapter { z-index: var(--stack-level, 1); }
 .chapter.is-active, .chapter.is-stacked, .chapter.is-preview, .chapter.is-leaving { visibility: visible; }
 .chapter.is-active, .chapter.is-preview, .chapter.is-leaving { z-index: var(--stack-level, 1) !important; }
@@ -204,12 +204,14 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .chapter.is-active .story-card,
 .chapter.is-stacked .story-card,
 .chapter.is-preview .story-card {
-  transform: translate(var(--stack-x, 0), var(--stack-y, 0)) rotate(var(--stack-angle, 0deg));
+  transform: translate(calc(var(--stack-x, 0px) + var(--drag-x, 0px)), calc(var(--stack-y, 0px) + var(--drag-y, 0px))) rotate(var(--stack-angle, 0deg));
 }
 .chapter.is-stacked .story-card { box-shadow: 0 2px 4px #2d342f12, 0 18px 38px -21px #2d342f66; }
 .card-stack.is-aligned .chapter.is-active .story-card,
 .card-stack.is-aligned .chapter.is-stacked .story-card,
-.card-stack.is-aligned .chapter.is-preview .story-card { transform: translate(0, 0) rotate(0deg); }
+.card-stack.is-aligned .chapter.is-preview .story-card { transform: translate(var(--drag-x, 0px), var(--drag-y, 0px)) rotate(0deg); }
+main.is-dragging .story-card,
+main.is-dragging .card-stack { transition: none; }
 .story-card { will-change: transform; }
 .menu-toggle { transition: opacity 140ms ease-in-out, transform 140ms ease-in-out, background .3s ease-in-out; }
 .tile-toggle {

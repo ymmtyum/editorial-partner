@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">プロフィール写真のプレースホルダー</title>
-  <desc id="desc">山本勇磨のプロフィール写真に差し替えるための仮画像</desc>
-  <rect width="512" height="512" fill="#d7e5df"/>
-  <circle cx="256" cy="196" r="86" fill="#73847d"/>
-  <path d="M98 474c14-106 74-166 158-166s144 60 158 166" fill="#73847d"/>
-  <text x="256" y="486" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#405149">PROFILE PHOTO</text>
-</svg>
