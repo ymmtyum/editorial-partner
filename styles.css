@@ -254,6 +254,7 @@ main.is-dragging .card-stack { transition: none; }
   overscroll-behavior: contain;
   opacity: 0;
 }
+.tile-view.is-active { opacity: 1; }
 .tile-view.is-morphing { background: #f3f2ec; backdrop-filter: none; }
 .tile-header {
   display: flex;
