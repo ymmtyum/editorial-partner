@@ -303,6 +303,16 @@
         </article>
       </section>
     </main>
+    <button class="tile-toggle" type="button" aria-label="カード一覧を開く" aria-controls="card-index" aria-expanded="false" hidden>
+      <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+    </button>
+    <section id="card-index" class="tile-view" aria-labelledby="card-index-title" aria-hidden="true" hidden>
+      <header class="tile-header">
+        <div><p>INDEX</p><h2 id="card-index-title">カード一覧</h2></div>
+        <button class="tile-close" type="button" aria-label="カード一覧を閉じる">×</button>
+      </header>
+      <nav class="tile-grid" aria-label="カードを選ぶ"></nav>
+    </section>
     <script src="./main.js" defer></script>
   </body>
 </html>
