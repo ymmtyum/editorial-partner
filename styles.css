@@ -34,9 +34,9 @@ main { touch-action: auto; }
 .hero-brand { position: fixed; z-index: 10; top: max(28px, env(safe-area-inset-top)); left: max(28px, env(safe-area-inset-left)); margin: 0; font: 500 13px/1.4 var(--font-body); letter-spacing: .14em; }
 .hero-lead { position: absolute; left: 50%; bottom: max(36px, 7vh); width: min(280px, calc(100% - 56px)); margin: 0; transform: translateX(-50%); text-align: left; font-size: clamp(12px, 1.25vw, 15px); line-height: 2.1; letter-spacing: .07em; color: #111; }
 .hero-lead strong { color: var(--ink); font-weight: 700; }
-.menu-toggle { position: fixed; top: max(24px, env(safe-area-inset-top)); right: max(28px, env(safe-area-inset-right)); z-index: 10; width: 52px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 12px; border: 1px solid #dedfd588; border-radius: 50%; background: #f8f7f2e6; backdrop-filter: blur(10px); transition: background .3s ease-in-out; }
+.menu-toggle { position: fixed; top: max(24px, env(safe-area-inset-top)); right: max(28px, env(safe-area-inset-right)); z-index: 40; width: 32px; height: 32px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 7px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .menu-toggle span { width: 22px; height: 1px; background: var(--ink); transition: width .3s ease-in-out; }
-.menu-toggle:hover { background: #e9ece2; }
+.menu-toggle:hover { background: transparent; }
 .menu-toggle:hover span:last-child { width: 15px; }
 .chapter, .rising-slot { display: grid; justify-items: center; align-items: safe center; padding: 90px clamp(24px, 7vw, 100px); }
 .story-card { --card-color: #fff; position: relative; display: flex; flex-direction: column; width: min(100%, 960px); height: min(660px, calc(100svh - 180px)); min-height: 0; padding: clamp(28px, 5vw, 66px) clamp(28px, 5vw, 66px) 22px; border: 1px solid #2d342f08; border-radius: 2px 3px 5px 2px; background: linear-gradient(165deg, #ffffff38, transparent 45%), var(--card-color); box-shadow: 0 2px 3px #2d342f0a, 0 14px 34px -18px #2d342f45; transform-origin: 50% 30%; transition: box-shadow .2s ease-out; }
@@ -118,7 +118,7 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
   .hero { padding: 0; }
   .hero h1 { font-size: clamp(30px, 5.8svh, 52px); }
   .hero-lead { font-size: 12px; letter-spacing: .025em; }
-  .menu-toggle { top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); width: 46px; height: 46px; }
+  .menu-toggle { top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); width: 32px; height: 32px; }
   .chapter, .rising-slot { padding: 82px 20px 40px; }
   .story-card { height: calc(100svh - 122px); min-height: 0; padding: 28px; }
   .card-copy { margin: 14px 0; padding: 12px 10px 12px 0; }
@@ -207,7 +207,7 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .chapter.is-preview { pointer-events: none; }
 .chapter.is-stacked { pointer-events: none; overflow: hidden; }
 .chapter { --rest-x: var(--stack-x, 0px); --rest-y: var(--stack-y, 0px); --rest-angle: var(--stack-angle, 0deg); }
-.chapter.is-neat { --rest-x: 0px; --rest-y: 0px; --rest-angle: 0deg; }
+.chapter.is-neat, .chapter.is-neat.is-preview { --rest-x: 0px; --rest-y: 0px; --rest-angle: 0deg; }
 .chapter.is-preview { --rest-x: var(--stack-x, 0px); --rest-y: var(--stack-y, 0px); --rest-angle: var(--stack-angle, 0deg); }
 .rising-slot { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
 .chapter.is-active .story-card,

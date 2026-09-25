@@ -119,7 +119,7 @@ function updateControls(nextView) {
   view = nextView;
   document.body.dataset.view = nextView;
   const onTop = nextView === 'top';
-  menuToggle.hidden = !onTop;
+  menuToggle.hidden = false;
   backTop.hidden = nextView === 'top' || nextView === 'tiles';
   if (tileToggle) {
     tileToggle.hidden = nextView !== 'card';
@@ -616,7 +616,7 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
   card.style.transform = restingTransform(index, deck.clientHeight + 60);
   cardStack.style.transform = 'none';
   document.body.dataset.view = 'transition';
-  menuToggle.hidden = true;
+  menuToggle.hidden = false;
   if (tileToggle) tileToggle.hidden = true;
   hero.inert = true;
   setHash(chapters[index].id);
@@ -727,7 +727,7 @@ function stashBundle(side, { focus = true } = {}) {
   deck.classList.remove('is-dragging');
   stashSide = direction;
   document.body.dataset.view = 'transition';
-  menuToggle.hidden = true;
+  menuToggle.hidden = false;
   if (tileToggle) tileToggle.hidden = true;
   hero.removeAttribute('aria-hidden');
   setHash('top');
@@ -761,7 +761,7 @@ function restoreBundle({ focus = true } = {}) {
   cardStack.classList.remove('is-held');
   deck.classList.remove('is-dragging');
   document.body.dataset.view = 'transition';
-  menuToggle.hidden = true;
+  menuToggle.hidden = false;
   if (tileToggle) tileToggle.hidden = true;
   setHash(chapters[activeIndex].id);
   const finish = () => {
