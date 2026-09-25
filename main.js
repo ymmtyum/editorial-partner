@@ -120,7 +120,7 @@ function updateControls(nextView) {
   document.body.dataset.view = nextView;
   const onTop = nextView === 'top';
   menuToggle.hidden = !onTop;
-  backTop.hidden = nextView !== 'card';
+  backTop.hidden = nextView === 'top' || nextView === 'tiles';
   tileToggle.hidden = nextView !== 'card';
   tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
   hero.inert = !onTop;
@@ -195,12 +195,20 @@ function rubber(value, min, max) {
 }
 
 function dragLimits() {
-  return {
-    minX: 0,
-    maxX: 0,
-    minY: activeIndex < chapters.length - 1 ? -Infinity : 0,
-    maxY: activeIndex > 0 ? Infinity : 0,
-  };
+  return { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity };
+}
+
+let dragIntent = 'idle';
+
+function fingerIntent() {
+  const up = Math.max(-pose.y, 0);
+  const right = Math.max(pose.x, 0);
+  const down = Math.max(pose.y, 0);
+  const left = Math.max(-pose.x, 0);
+  if (down > 28 && right > 24 && right > down * 0.45) return 'top';
+  if (up + right >= down + left && up + right > 8) return 'forward';
+  if (down + left > 8) return 'back';
+  return 'idle';
 }
 
 function notePose() {
@@ -274,33 +282,51 @@ function applyPose() {
   cardStack.style.setProperty('--bundle-y', '0px');
   cardStack.style.setProperty('--bundle-rot', '0deg');
   deck.classList.toggle('is-dragging', tracking);
+  dragIntent = fingerIntent();
   const travel = cardTravel();
   const nextIndex = activeIndex + 1;
-  const showNext = pose.y < -0.5 && nextIndex < chapters.length && nextIndex >= 0;
-  if (showNext) {
+  if (dragIntent === 'forward' && nextIndex >= 0 && nextIndex < chapters.length) {
     const chapter = chapters[nextIndex];
     chapter.classList.add('is-preview');
     chapter.inert = true;
     chapter.setAttribute('aria-hidden', 'true');
     const card = cardFor(nextIndex);
-    card.style.setProperty('--drag-y', `${travel + pose.y}px`);
-    card.style.setProperty('--drag-x', '0px');
+    const pull = Math.min(pose.y, 0) - Math.max(pose.x, 0);
+    card.style.setProperty('--drag-x', `${pose.x}px`);
+    card.style.setProperty('--drag-y', `${travel + pull}px`);
     card.classList.add('is-held');
     shownNext = nextIndex;
+    if (activeIndex >= 0) clearCardDrag(activeIndex);
   } else if (shownNext >= 0) {
     clearCardDrag(shownNext);
     hideChapter(shownNext);
     shownNext = -1;
   }
-  if (activeIndex >= 0) {
+  if (dragIntent === 'back' && activeIndex >= 0) {
     const card = cardFor(activeIndex);
-    if (pose.y > 0.5) {
-      card.style.setProperty('--drag-y', `${pose.y}px`);
-      card.style.setProperty('--drag-x', '0px');
-      card.classList.add('is-held');
-    } else clearCardDrag(activeIndex);
+    card.style.setProperty('--drag-x', `${pose.x}px`);
+    card.style.setProperty('--drag-y', `${Math.max(pose.y, 0)}px`);
+    card.classList.add('is-held');
+  } else if (dragIntent !== 'top' && activeIndex >= 0 && dragIntent !== 'forward') {
+    clearCardDrag(activeIndex);
   }
-  hero.style.opacity = view === 'top' ? '1' : '0';
+  if (dragIntent === 'top') {
+    const underIndex = activeIndex > 0 ? activeIndex - 1 : activeIndex;
+    const under = cardFor(underIndex);
+    if (under) {
+      under.style.setProperty('--drag-x', `${pose.x}px`);
+      under.style.setProperty('--drag-y', `${pose.y}px`);
+      under.classList.add('is-held');
+    }
+    if (activeIndex > 0) {
+      const current = cardFor(activeIndex);
+      current.style.setProperty('--drag-x', '0px');
+      current.style.setProperty('--drag-y', `${Math.max(pose.y, 72)}px`);
+    }
+    hero.style.opacity = String(Math.min(1, Math.hypot(pose.x, pose.y) / 280));
+  } else if (view !== 'top') {
+    hero.style.opacity = '0';
+  }
 }
 
 function stopSpring() {
@@ -388,22 +414,33 @@ function shouldCommit(delta, velocity, span) {
 function releasePose(velocity = poseVelocity()) {
   tracking = false;
   deck.classList.remove('is-dragging');
-  pose.x = 0;
   const travel = cardTravel();
-  if (pose.y < 0 && activeIndex + 1 < chapters.length && shouldCommit(pose.y, velocity.y, travel)) {
-    springPose(0, -travel, velocity, commitNextCard);
+  const intent = dragIntent;
+  if (intent === 'top' && (pose.x > 80 || velocity.x > 0.4)) {
+    springPose(Math.max(pose.x, deck.clientWidth * 0.8), pose.y, velocity, () => {
+      dragIntent = 'idle';
+      if (location.hash !== '#top') location.hash = '#top';
+    });
     return;
   }
-  if (pose.y > 0 && activeIndex > 0 && shouldCommit(pose.y, velocity.y, travel)) {
-    springPose(0, travel, velocity, commitPreviousCard);
+  const forwardPull = Math.min(pose.y, 0) - Math.max(pose.x, 0);
+  if (intent === 'forward' && activeIndex + 1 < chapters.length && shouldCommit(forwardPull, Math.min(velocity.y, -velocity.x), travel)) {
+    springPose(0, -travel, velocity, () => { dragIntent = 'idle'; commitNextCard(); });
     return;
   }
+  const backPull = Math.max(pose.y, 0) + Math.max(-pose.x, 0);
+  if (intent === 'back' && activeIndex > 0 && shouldCommit(backPull, Math.max(velocity.y, -velocity.x), travel)) {
+    springPose(0, travel, velocity, () => { dragIntent = 'idle'; commitPreviousCard(); });
+    return;
+  }
+  dragIntent = 'idle';
   springPose(0, 0, velocity, () => {
     if (shownNext >= 0) {
       clearCardDrag(shownNext);
       hideChapter(shownNext);
       shownNext = -1;
     }
+    if (activeIndex > 0) clearCardDrag(activeIndex - 1);
     clearCardDrag(activeIndex);
   });
 }
@@ -1147,12 +1184,11 @@ window.addEventListener('wheel', (event) => {
     gesture.axis = Math.abs(gesture.sumY) > Math.abs(gesture.sumX) * 1.35 ? 'y' : 'x';
   }
   const limits = dragLimits();
-  const step = gesture.axis === 'x'
-    ? (gesture.lockedApplied ? dx : gesture.sumX)
-    : (gesture.lockedApplied ? dy : gesture.sumY);
+  const stepX = gesture.lockedApplied ? dx : gesture.sumX;
+  const stepY = gesture.lockedApplied ? dy : gesture.sumY;
   gesture.lockedApplied = true;
-  pose.x = 0;
-  pose.y = rubber(pose.y - step, limits.minY, limits.maxY);
+  pose.x = rubber(pose.x + stepX, limits.minX, limits.maxX);
+  pose.y = rubber(pose.y - stepY, limits.minY, limits.maxY);
   gesture.moved = true;
   tracking = true;
   notePose();
@@ -1188,9 +1224,12 @@ function moveDrag(gesture, x, y) {
       gesture.originY = y;
     }
   }
+  if (gesture.mode === 'read' && Math.abs(rawX) > 18) {
+    gesture.mode = 'nav';
+    tracking = true;
+  }
   if (!gesture.mode && Math.hypot(rawX, rawY) > 8) {
     const vertical = Math.abs(rawY) > Math.abs(rawX) * 1.35;
-    gesture.axis = vertical ? 'y' : 'x';
     const readDirection = rawY < 0 ? 1 : -1;
     gesture.mode = view === 'card' && vertical && canReadFurther(readDirection) ? 'read' : 'nav';
     if (gesture.mode === 'nav') tracking = true;
@@ -1210,11 +1249,8 @@ function moveDrag(gesture, x, y) {
   }
   if (gesture.mode !== 'nav') return;
   const limits = dragLimits();
-  const dragX = gesture.axis === 'y' ? 0 : x - gesture.originX;
-  const dragY = gesture.axis === 'x' ? 0 : y - gesture.originY;
-  const progress = gesture.axis === 'x' ? -dragX : dragY;
-  pose.x = 0;
-  pose.y = rubber(gesture.baseY + progress, limits.minY, limits.maxY);
+  pose.x = rubber(x - gesture.originX, limits.minX, limits.maxX);
+  pose.y = rubber(y - gesture.originY, limits.minY, limits.maxY);
   tracking = true;
   notePose();
   applyPose();
