@@ -126,8 +126,11 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
   .menu-dialog { padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
   .index-link { padding: 17px 0; font-size: 13px; }
   .profile { grid-template-columns: 1fr; }
-  .case-links, .case-link { grid-template-columns: 1fr; }
+  .case-link { grid-template-columns: 1fr; }
+  .case-links { gap: 8px; }
   .case-image { aspect-ratio: 1.91 / 1; min-height: 0; }
+  .case-copy { gap: 4px; padding: 10px; }
+  .case-title { font-size: 11px; line-height: 1.45; }
   .statement-list, .article-examples { grid-template-columns: 1fr; }
   .statement-list p:nth-child(even) { padding-left: 0; border-left: 0; }
   .article-examples p { min-height: 0; }
