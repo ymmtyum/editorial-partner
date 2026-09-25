@@ -405,8 +405,12 @@ function releasePose(velocity = poseVelocity()) {
     return;
   }
   const backPull = Math.max(pose.y, 0);
-  if (intent === 'back' && activeIndex > 0 && shouldCommit(backPull, velocity.y, travel)) {
-    springPose(0, travel, velocity, () => { dragIntent = 'idle'; commitPreviousCard(); });
+  if (intent === 'back' && activeIndex >= 0 && shouldCommit(backPull, velocity.y, travel)) {
+    springPose(0, travel, velocity, () => {
+      dragIntent = 'idle';
+      if (activeIndex > 0) commitPreviousCard();
+      else if (location.hash !== '#top') location.hash = '#top';
+    });
     return;
   }
   dragIntent = 'idle';
@@ -1097,7 +1101,10 @@ indexLinks.forEach((link) => {
   link.addEventListener('click', (event) => {
     event.preventDefault();
     menu.close();
-    if (link.hash === '#top') return;
+    if (link.hash === '#top') {
+      if (location.hash !== '#top') location.hash = '#top';
+      return;
+    }
     const index = chapters.findIndex((chapter) => `#${chapter.id}` === link.hash);
     if (index < 0) return;
     if (activeIndex >= 0 && stashSide) {
@@ -1342,6 +1349,7 @@ window.addEventListener('keydown', (event) => {
     scrollCurrentCard(event.key === ' ' ? deck.clientHeight * .72 : 48);
   } else if (!event.repeat && forward && activeIndex + 1 < chapters.length) commitNextCard();
   else if (!event.repeat && back && activeIndex > 0) commitPreviousCard();
+  else if (!event.repeat && back && activeIndex === 0 && location.hash !== '#top') location.hash = '#top';
 });
 
 function syncFromHash() {
