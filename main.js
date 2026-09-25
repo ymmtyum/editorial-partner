@@ -457,6 +457,19 @@ function commitEnteredCard() {
 
 function commitNextCard() {
   const index = activeIndex + 1;
+  if (index >= chapters.length) return;
+  if (activeIndex < 0) {
+    clearCardDrag(index);
+    shownNext = -1;
+    activeIndex = index;
+    pose = { x: 0, y: 0 };
+    renderStack(index);
+    hero.style.opacity = '0';
+    setHash(chapters[index].id);
+    updateControls('card');
+    chapters[index].focus({ preventScroll: true });
+    return;
+  }
   const incoming = chapters[index];
   clearCardDrag(activeIndex);
   clearCardDrag(index);
