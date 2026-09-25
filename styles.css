@@ -252,7 +252,7 @@ main.is-dragging .card-stack { transition: none; }
   position: fixed;
   left: 50%;
   bottom: max(22px, env(safe-area-inset-bottom));
-  z-index: 12;
+  z-index: 40;
   width: 52px;
   height: 52px;
   display: grid;
@@ -266,6 +266,7 @@ main.is-dragging .card-stack { transition: none; }
   font: 28px/1 Arial, sans-serif;
   transform: translateX(-50%);
 }
+.back-top[hidden] { display: none !important; }
 .back-top:hover { background: var(--accent); }
 
 .tile-view {
