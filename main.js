@@ -52,6 +52,7 @@ chapters.forEach((chapter, index) => {
   chapter.style.setProperty('--stack-y', `${look.y}px`);
   chapter.style.setProperty('--stack-angle', `${look.angle}deg`);
 
+  if (chapter.classList.contains('is-sheet')) return;
   const title = chapter.querySelector('h2')?.textContent.trim() || '';
   const button = document.createElement('button');
   button.type = 'button';
@@ -117,7 +118,7 @@ function updateControls(nextView) {
   document.body.dataset.view = nextView;
   const onTop = nextView === 'top';
   menuToggle.hidden = !onTop;
-  tileToggle.hidden = nextView !== 'card';
+  tileToggle.hidden = nextView !== 'card' || chapters[activeIndex]?.classList.contains('is-sheet');
   tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
   hero.inert = !onTop;
   hero.toggleAttribute('aria-hidden', !onTop);
