@@ -141,7 +141,9 @@ function hideChapter(index) {
   chapter.classList.remove('is-active', 'is-stacked', 'is-preview', 'is-leaving');
   chapter.inert = true;
   chapter.setAttribute('aria-hidden', 'true');
-  cardFor(index).style.removeProperty('transform');
+  const card = cardFor(index);
+  card.getAnimations().forEach((animation) => animation.cancel());
+  card.style.removeProperty('transform');
 }
 
 function renderStack(index) {
@@ -1077,14 +1079,14 @@ function dismissCardUp() {
     if (chapterIndex !== index) hideChapter(chapterIndex);
   });
   const card = cardFor(index);
-  const distance = -(window.innerHeight * 0.92);
+  const distance = window.innerHeight * 0.92;
   transitioning = true;
   hero.style.opacity = '1';
   const animation = card.animate(
     [
       { transform: getComputedStyle(card).transform, offset: 0 },
-      { transform: `translate3d(0, ${distance * 0.18}px, 0)`, offset: 0.28 },
-      { transform: `translate3d(0, ${distance}px, 0) rotate(-1.2deg)`, offset: 1 },
+      { transform: `translate3d(0, ${distance * 0.12}px, 0)`, offset: 0.22 },
+      { transform: `translate3d(0, ${distance}px, 0)`, offset: 1 },
     ],
     { duration: reduceMotion.matches ? 1 : 420, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'forwards' },
   );
