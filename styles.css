@@ -29,10 +29,10 @@ main { touch-action: auto; }
 .hero.is-leaving, .chapter.is-leaving { visibility: visible; pointer-events: none; }
 .hero:focus, .chapter:focus { outline: none; }
 .hero { display: grid; place-items: center; padding: 0; }
-.hero h1 { display: flex; flex-direction: row-reverse; align-items: center; gap: .32em; margin: 0; font-family: var(--font-display); font-size: clamp(34px, 6.4svh, 72px); font-weight: 700; line-height: 1.4; letter-spacing: .1em; }
+.hero h1 { display: flex; flex-direction: row-reverse; gap: .32em; margin: 0; font-family: var(--font-display); font-size: clamp(34px, 6.4svh, 72px); font-weight: 700; line-height: 1.4; letter-spacing: .1em; }
 .hero h1 > .headline-line { writing-mode: vertical-rl; text-orientation: mixed; white-space: nowrap; }
 .hero-brand { position: fixed; z-index: 40; top: max(28px, env(safe-area-inset-top)); left: max(28px, env(safe-area-inset-left)); margin: 0; font: 500 13px/1.4 var(--font-body); letter-spacing: .14em; pointer-events: none; }
-.hero-lead { position: absolute; left: 50%; bottom: max(36px, 7vh); width: min(280px, calc(100% - 56px)); margin: 0; transform: translateX(-50%); text-align: left; font-size: clamp(12px, 1.25vw, 15px); line-height: 2.1; letter-spacing: .07em; color: #111; }
+.hero-lead { position: absolute; left: 50%; bottom: max(36px, 7vh); width: max-content; max-width: calc(100% - 56px); margin: 0; transform: translateX(-50%); text-align: left; font-size: clamp(12px, 1.25vw, 15px); line-height: 2.1; letter-spacing: .07em; color: #111; }
 .hero-lead strong { color: var(--ink); font-weight: 700; }
 .menu-toggle { position: fixed; top: max(24px, env(safe-area-inset-top)); right: max(28px, env(safe-area-inset-right)); z-index: 40; width: 32px; height: 32px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 7px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .menu-toggle span { width: 22px; height: 1px; background: var(--ink); transition: width .3s ease-in-out; }
@@ -168,6 +168,7 @@ main.is-dragging { cursor: grabbing; user-select: none; }
 .marker-word::before { top: -.04em; bottom: -.07em; right: .07em; width: .56em; opacity: .8; transform: rotate(-5deg); clip-path: polygon(8% 2%, 74% 0, 100% 3%, 83% 24%, 96% 45%, 79% 68%, 94% 96%, 54% 100%, 0 97%, 14% 73%, 2% 48%, 17% 25%); }
 .marker-word::after { top: .03em; bottom: -.02em; right: -.04em; width: .15em; opacity: .5; transform: rotate(-3deg); clip-path: polygon(0 3%, 76% 0, 100% 28%, 60% 55%, 90% 93%, 20% 100%, 0 69%); }
 .hero.is-active .marker-word::before, .hero.is-active .marker-word::after { animation: marker-swish 180ms cubic-bezier(.2,.8,.3,1) 100ms both; }
+.headline-offset { transform: translateY(.8em); }
 .hero.is-active .headline-offset .marker-word::before, .hero.is-active .headline-offset .marker-word::after { animation-delay: 230ms; }
 @keyframes marker-swish { from { scale: 1 0; } to { scale: 1 1; } }
 .hero-footer { position: absolute; left: max(28px, env(safe-area-inset-left)); right: max(28px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
