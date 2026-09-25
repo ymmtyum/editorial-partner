@@ -69,6 +69,12 @@ main { touch-action: auto; }
 .close-button { display: grid; place-items: center; border: 1px solid var(--line); background: transparent; border-radius: 50%; width: 38px; height: 38px; font: 27px/1 Arial, sans-serif; transition: background .2s, transform .2s; }
 .close-button:hover { background: var(--accent); transform: rotate(90deg); }
 .profile { display: grid; grid-template-columns: 120px 1fr; gap: 24px; align-items: start; }
+.voice { display: grid; grid-template-columns: 72px 1fr; gap: 22px; align-items: start; margin: 0; }
+.voice-person { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.voice-photo { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; object-position: center 18%; }
+.voice-person span { font-size: 11px; letter-spacing: .14em; }
+.voice blockquote { margin: 0; }
+.voice blockquote p { margin: 0 0 14px; }
 .text-large { margin-bottom: clamp(28px, 5vh, 52px) !important; font: 600 clamp(27px, 4vw, 50px)/1.55 var(--font-display); letter-spacing: .04em; color: var(--ink); }
 .text-small { font-size: 12px; line-height: 1.9; color: var(--muted); }
 .statement-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); }
