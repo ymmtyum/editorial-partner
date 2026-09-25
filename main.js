@@ -308,7 +308,6 @@ function applyPose() {
   } else if (activeIndex >= 0 && dragIntent !== 'forward') {
     clearCardDrag(activeIndex);
   }
-  if (view !== 'top') hero.style.opacity = '0';
 }
 
 function stopSpring() {
@@ -447,7 +446,7 @@ function finishPose(action, targetX) {
     deck.classList.remove('is-dragging');
     cardStack.classList.remove('is-held');
     if (view === 'top' && !stashSide) hero.style.opacity = '1';
-    if (view === 'card') hero.style.opacity = '0';
+    if (view === 'card') hero.style.opacity = '1';
   }
 }
 
@@ -466,7 +465,7 @@ function commitEnteredCard() {
   activeIndex = 0;
   stashSide = 0;
   renderStack(0);
-  hero.style.opacity = '0';
+  hero.style.opacity = '1';
   setHash(chapters[0].id);
   updateControls('card');
   chapters[0].focus({ preventScroll: true });
@@ -481,7 +480,7 @@ function commitNextCard() {
     activeIndex = index;
     pose = { x: 0, y: 0 };
     renderStack(index);
-    hero.style.opacity = '0';
+    hero.style.opacity = '1';
     setHash(chapters[index].id);
     updateControls('card');
     chapters[index].focus({ preventScroll: true });
@@ -501,7 +500,7 @@ function commitNextCard() {
   pose = { x: 0, y: 0 };
   cardStack.style.removeProperty('--bundle-x');
   cardStack.style.removeProperty('--bundle-rot');
-  hero.style.opacity = '0';
+  hero.style.opacity = '1';
   setHash(incoming.id);
   updateControls('card');
   incoming.focus({ preventScroll: true });
@@ -519,7 +518,7 @@ function commitPreviousCard() {
   pose = { x: 0, y: 0 };
   cardStack.style.removeProperty('--bundle-x');
   cardStack.style.removeProperty('--bundle-rot');
-  hero.style.opacity = '0';
+  hero.style.opacity = '1';
   setHash(chapters[nextIndex].id);
   updateControls('card');
   chapters[nextIndex].focus({ preventScroll: true });
@@ -545,7 +544,7 @@ function commitPeel() {
   }
   activeIndex = next;
   renderStack(next);
-  hero.style.opacity = '0';
+  hero.style.opacity = '1';
   setHash(chapters[next].id);
   updateControls('card');
   chapters[next].focus({ preventScroll: true });
@@ -579,7 +578,7 @@ function commitRestore() {
   cardStack.style.removeProperty('--bundle-y');
   cardStack.style.removeProperty('--bundle-rot');
   cardStack.style.removeProperty('transform');
-  hero.style.opacity = '0';
+  hero.style.opacity = '1';
   setHash(chapters[activeIndex].id);
   updateControls('card');
   chapters[activeIndex].focus({ preventScroll: true });
@@ -606,7 +605,7 @@ function clearPreviewInstant() {
     cardStack.style.removeProperty('--bundle-x');
     cardStack.style.removeProperty('--bundle-rot');
   }
-  hero.style.opacity = view === 'top' ? '1' : '0';
+  hero.style.opacity = '1';
 }
 
 function enterStack(index = 0, { animate = true, focus = true } = {}) {
@@ -626,7 +625,7 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
   setHash(chapters[index].id);
   const finish = () => {
     card.style.removeProperty('transform');
-    hero.style.opacity = '0';
+    hero.style.opacity = '1';
     updateControls('card');
     if (focus) chapters[index].focus({ preventScroll: true });
   };
@@ -638,10 +637,6 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
   playTransition([
     card.animate(
       [{ transform: restingTransform(index, deck.clientHeight + 60) }, { transform: restingTransform(index) }],
-      { duration, easing: 'ease-in-out', fill: 'both' },
-    ),
-    hero.animate(
-      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 0 }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ),
   ], duration, finish);
@@ -776,7 +771,7 @@ function restoreBundle({ focus = true } = {}) {
     cardStack.style.removeProperty('--bundle-x');
     cardStack.style.removeProperty('--bundle-y');
     cardStack.style.removeProperty('--bundle-rot');
-    hero.style.opacity = '0';
+    hero.style.opacity = '1';
     updateControls('card');
     if (focus) chapters[activeIndex].focus({ preventScroll: true });
   };
@@ -788,10 +783,6 @@ function restoreBundle({ focus = true } = {}) {
   playTransition([
     cardStack.animate(
       [{ transform: start }, { transform: 'translateX(0) rotate(0deg)' }],
-      { duration, easing: 'ease-in-out', fill: 'both' },
-    ),
-    hero.animate(
-      [{ opacity: getComputedStyle(hero).opacity }, { opacity: 0 }],
       { duration, easing: 'ease-in-out', fill: 'both' },
     ),
   ], duration, finish);
@@ -1075,10 +1066,35 @@ faqItems.forEach((item) => {
   });
 });
 
-backTop.addEventListener('click', () => {
+function dismissCardUp() {
   resetWheel(false);
-  if (location.hash !== '#top') location.hash = '#top';
-});
+  if (view !== 'card' || activeIndex < 0 || transitioning) {
+    if (location.hash !== '#top') location.hash = '#top';
+    return;
+  }
+  const index = activeIndex;
+  chapters.forEach((_, chapterIndex) => {
+    if (chapterIndex !== index) hideChapter(chapterIndex);
+  });
+  const card = cardFor(index);
+  const distance = -(window.innerHeight * 0.92);
+  transitioning = true;
+  hero.style.opacity = '1';
+  const animation = card.animate(
+    [
+      { transform: getComputedStyle(card).transform, offset: 0 },
+      { transform: `translate3d(0, ${distance * 0.18}px, 0)`, offset: 0.28 },
+      { transform: `translate3d(0, ${distance}px, 0) rotate(-1.2deg)`, offset: 1 },
+    ],
+    { duration: reduceMotion.matches ? 1 : 420, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'forwards' },
+  );
+  animation.finished.then(() => {
+    transitioning = false;
+    if (location.hash !== '#top') location.hash = '#top';
+  }).catch(() => { transitioning = false; });
+}
+
+backTop.addEventListener('click', dismissCardUp);
 menuToggle.addEventListener('click', () => {
   resetWheel(false);
   menu.showModal();
@@ -1374,12 +1390,12 @@ function syncFromHash() {
   } else if (index >= 0) {
     activeIndex = index;
     renderStack(index);
-    hero.style.opacity = '0';
+    hero.style.opacity = '1';
     updateControls('card');
   } else {
     activeIndex = 0;
     renderStack(0);
-    hero.style.opacity = '0';
+    hero.style.opacity = '1';
     updateControls('card');
   }
 }
