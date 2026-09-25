@@ -288,8 +288,11 @@ main.is-dragging .card-stack { transition: none; }
   backdrop-filter: blur(10px);
   font: 28px/1 Arial, sans-serif;
   transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease-in-out, background 160ms ease-in-out;
 }
-.back-top[hidden] { display: none !important; }
+.back-top.is-shown { opacity: 1; pointer-events: auto; }
 .back-top:hover { background: var(--accent); }
 
 .tile-view {

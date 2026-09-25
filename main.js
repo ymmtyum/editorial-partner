@@ -120,7 +120,10 @@ function updateControls(nextView) {
   document.body.dataset.view = nextView;
   const onTop = nextView === 'top';
   menuToggle.hidden = false;
-  backTop.hidden = nextView === 'top' || nextView === 'tiles';
+  const showClose = nextView === 'card';
+  backTop.classList.toggle('is-shown', showClose);
+  backTop.setAttribute('aria-hidden', showClose ? 'false' : 'true');
+  backTop.tabIndex = showClose ? 0 : -1;
   if (tileToggle) {
     tileToggle.hidden = nextView !== 'card';
     tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
