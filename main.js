@@ -65,7 +65,7 @@ chapters.forEach((chapter, index) => {
   face.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
   button.append(face);
   button.setAttribute('aria-label', `${String(index + 1).padStart(2, '0')} ${title}へ移動`);
-  tileGrid.append(button);
+  tileGrid?.append(button);
 });
 
 function bundleDistance() {
@@ -109,7 +109,7 @@ function updateCurrentLinks() {
     if (link.hash === currentHash) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
   });
-  [...tileGrid.querySelectorAll('.tile-card')].forEach((button, index) => {
+  [...(tileGrid?.querySelectorAll('.tile-card') || [])].forEach((button, index) => {
     if (index === activeIndex) button.setAttribute('aria-current', 'true');
     else button.removeAttribute('aria-current');
   });
@@ -121,8 +121,10 @@ function updateControls(nextView) {
   const onTop = nextView === 'top';
   menuToggle.hidden = !onTop;
   backTop.hidden = nextView === 'top' || nextView === 'tiles';
-  tileToggle.hidden = nextView !== 'card';
-  tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
+  if (tileToggle) {
+    tileToggle.hidden = nextView !== 'card';
+    tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
+  }
   hero.inert = !onTop;
   hero.toggleAttribute('aria-hidden', !onTop);
   chapters.forEach((chapter, index) => {
@@ -159,7 +161,7 @@ function cancelTransition() {
   runningAnimations.forEach((animation) => animation.cancel());
   runningAnimations = [];
   cardStack.classList.remove('is-morph-source');
-  tileView.classList.remove('is-morphing');
+  tileView?.classList.remove('is-morphing');
   tileGrid?.querySelectorAll('.is-morphing').forEach((button) => button.classList.remove('is-morphing'));
   transitionVersion += 1;
   transitioning = false;
@@ -202,12 +204,9 @@ let dragIntent = 'idle';
 
 function fingerIntent() {
   const up = Math.max(-pose.y, 0);
-  const right = Math.max(pose.x, 0);
   const down = Math.max(pose.y, 0);
-  const left = Math.max(-pose.x, 0);
-  if (down > 28 && right > 24 && right > down * 0.45) return 'top';
-  if (up + right >= down + left && up + right > 8) return 'forward';
-  if (down + left > 8) return 'back';
+  if (up > 8 && up >= down) return 'forward';
+  if (down > 8) return 'back';
   return 'idle';
 }
 
@@ -291,9 +290,8 @@ function applyPose() {
     chapter.inert = true;
     chapter.setAttribute('aria-hidden', 'true');
     const card = cardFor(nextIndex);
-    const pull = Math.min(pose.y, 0) - Math.max(pose.x, 0);
-    card.style.setProperty('--drag-x', `${pose.x}px`);
-    card.style.setProperty('--drag-y', `${travel + pull}px`);
+    card.style.setProperty('--drag-x', '0px');
+    card.style.setProperty('--drag-y', `${travel + Math.min(pose.y, 0)}px`);
     card.classList.add('is-held');
     shownNext = nextIndex;
     if (activeIndex >= 0) clearCardDrag(activeIndex);
@@ -304,29 +302,13 @@ function applyPose() {
   }
   if (dragIntent === 'back' && activeIndex >= 0) {
     const card = cardFor(activeIndex);
-    card.style.setProperty('--drag-x', `${pose.x}px`);
+    card.style.setProperty('--drag-x', '0px');
     card.style.setProperty('--drag-y', `${Math.max(pose.y, 0)}px`);
     card.classList.add('is-held');
-  } else if (dragIntent !== 'top' && activeIndex >= 0 && dragIntent !== 'forward') {
+  } else if (activeIndex >= 0 && dragIntent !== 'forward') {
     clearCardDrag(activeIndex);
   }
-  if (dragIntent === 'top') {
-    const underIndex = activeIndex > 0 ? activeIndex - 1 : activeIndex;
-    const under = cardFor(underIndex);
-    if (under) {
-      under.style.setProperty('--drag-x', `${pose.x}px`);
-      under.style.setProperty('--drag-y', `${pose.y}px`);
-      under.classList.add('is-held');
-    }
-    if (activeIndex > 0) {
-      const current = cardFor(activeIndex);
-      current.style.setProperty('--drag-x', '0px');
-      current.style.setProperty('--drag-y', `${Math.max(pose.y, 72)}px`);
-    }
-    hero.style.opacity = String(Math.min(1, Math.hypot(pose.x, pose.y) / 280));
-  } else if (view !== 'top') {
-    hero.style.opacity = '0';
-  }
+  if (view !== 'top') hero.style.opacity = '0';
 }
 
 function stopSpring() {
@@ -416,20 +398,14 @@ function releasePose(velocity = poseVelocity()) {
   deck.classList.remove('is-dragging');
   const travel = cardTravel();
   const intent = dragIntent;
-  if (intent === 'top' && (pose.x > 80 || velocity.x > 0.4)) {
-    springPose(Math.max(pose.x, deck.clientWidth * 0.8), pose.y, velocity, () => {
-      dragIntent = 'idle';
-      if (location.hash !== '#top') location.hash = '#top';
-    });
+  pose.x = 0;
+  const forwardPull = Math.min(pose.y, 0);
+  if (intent === 'forward' && activeIndex + 1 < chapters.length && shouldCommit(forwardPull, velocity.y, travel)) {
+    springPose(0, -travel, { x: 0, y: velocity.y }, () => { dragIntent = 'idle'; commitNextCard(); });
     return;
   }
-  const forwardPull = Math.min(pose.y, 0) - Math.max(pose.x, 0);
-  if (intent === 'forward' && activeIndex + 1 < chapters.length && shouldCommit(forwardPull, Math.min(velocity.y, -velocity.x), travel)) {
-    springPose(0, -travel, velocity, () => { dragIntent = 'idle'; commitNextCard(); });
-    return;
-  }
-  const backPull = Math.max(pose.y, 0) + Math.max(-pose.x, 0);
-  if (intent === 'back' && activeIndex > 0 && shouldCommit(backPull, Math.max(velocity.y, -velocity.x), travel)) {
+  const backPull = Math.max(pose.y, 0);
+  if (intent === 'back' && activeIndex > 0 && shouldCommit(backPull, velocity.y, travel)) {
     springPose(0, travel, velocity, () => { dragIntent = 'idle'; commitPreviousCard(); });
     return;
   }
@@ -641,7 +617,7 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
   cardStack.style.transform = 'none';
   document.body.dataset.view = 'transition';
   menuToggle.hidden = true;
-  tileToggle.hidden = true;
+  if (tileToggle) tileToggle.hidden = true;
   hero.inert = true;
   setHash(chapters[index].id);
   const finish = () => {
@@ -752,7 +728,7 @@ function stashBundle(side, { focus = true } = {}) {
   stashSide = direction;
   document.body.dataset.view = 'transition';
   menuToggle.hidden = true;
-  tileToggle.hidden = true;
+  if (tileToggle) tileToggle.hidden = true;
   hero.removeAttribute('aria-hidden');
   setHash('top');
   const target = `translateX(${direction * bundleDistance()}px) rotate(${direction * 2}deg)`;
@@ -786,7 +762,7 @@ function restoreBundle({ focus = true } = {}) {
   deck.classList.remove('is-dragging');
   document.body.dataset.view = 'transition';
   menuToggle.hidden = true;
-  tileToggle.hidden = true;
+  if (tileToggle) tileToggle.hidden = true;
   setHash(chapters[activeIndex].id);
   const finish = () => {
     stashPoint = null;
@@ -1068,9 +1044,9 @@ function closeTiles(targetIndex = activeIndex, { focus = true } = {}) {
   else Promise.allSettled(animations.map((animation) => animation.finished)).then(finish);
 }
 
-tileToggle.addEventListener('click', openTiles);
-tileClose.addEventListener('click', () => closeTiles());
-tileGrid.addEventListener('click', (event) => {
+tileToggle?.addEventListener('click', openTiles);
+tileClose?.addEventListener('click', () => closeTiles());
+tileGrid?.addEventListener('click', (event) => {
   if (performance.now() < suppressClickUntil) return;
   const button = event.target.closest('.tile-card');
   if (registerKnock()) {
@@ -1181,13 +1157,17 @@ window.addEventListener('wheel', (event) => {
   }
   if (!gesture.axis) {
     if (Math.hypot(gesture.sumX, gesture.sumY) < 8) return;
-    gesture.axis = Math.abs(gesture.sumY) > Math.abs(gesture.sumX) * 1.35 ? 'y' : 'x';
+    if (Math.abs(gesture.sumX) >= Math.abs(gesture.sumY)) {
+      gesture.axis = 'x';
+      return;
+    }
+    gesture.axis = 'y';
   }
+  if (gesture.axis !== 'y') return;
   const limits = dragLimits();
-  const stepX = gesture.lockedApplied ? dx : gesture.sumX;
   const stepY = gesture.lockedApplied ? dy : gesture.sumY;
   gesture.lockedApplied = true;
-  pose.x = rubber(pose.x + stepX, limits.minX, limits.maxX);
+  pose.x = 0;
   pose.y = rubber(pose.y - stepY, limits.minY, limits.maxY);
   gesture.moved = true;
   tracking = true;
@@ -1224,15 +1204,14 @@ function moveDrag(gesture, x, y) {
       gesture.originY = y;
     }
   }
-  if (gesture.mode === 'read' && Math.abs(rawX) > 18) {
-    gesture.mode = 'nav';
-    tracking = true;
-  }
   if (!gesture.mode && Math.hypot(rawX, rawY) > 8) {
-    const vertical = Math.abs(rawY) > Math.abs(rawX) * 1.35;
-    const readDirection = rawY < 0 ? 1 : -1;
-    gesture.mode = view === 'card' && vertical && canReadFurther(readDirection) ? 'read' : 'nav';
-    if (gesture.mode === 'nav') tracking = true;
+    if (Math.abs(rawX) >= Math.abs(rawY)) {
+      gesture.mode = 'ignore';
+    } else {
+      const readDirection = rawY < 0 ? 1 : -1;
+      gesture.mode = view === 'card' && canReadFurther(readDirection) ? 'read' : 'nav';
+      if (gesture.mode === 'nav') tracking = true;
+    }
   }
   if (gesture.mode === 'read') {
     const direction = Math.sign(step);
@@ -1249,7 +1228,7 @@ function moveDrag(gesture, x, y) {
   }
   if (gesture.mode !== 'nav') return;
   const limits = dragLimits();
-  pose.x = rubber(x - gesture.originX, limits.minX, limits.maxX);
+  pose.x = 0;
   pose.y = rubber(y - gesture.originY, limits.minY, limits.maxY);
   tracking = true;
   notePose();
@@ -1355,8 +1334,8 @@ window.addEventListener('keydown', (event) => {
     if (location.hash !== '#top') location.hash = '#top';
     return;
   }
-  const forward = ['ArrowUp', 'ArrowRight', 'PageDown', ' '].includes(event.key);
-  const back = ['ArrowDown', 'ArrowLeft', 'PageUp'].includes(event.key);
+  const forward = ['ArrowUp', 'PageDown', ' '].includes(event.key);
+  const back = ['ArrowDown', 'PageUp'].includes(event.key);
   if (!forward && !back) return;
   event.preventDefault();
   if (forward && canReadFurther(1) && ['PageDown', ' '].includes(event.key)) {
@@ -1368,9 +1347,11 @@ window.addEventListener('keydown', (event) => {
 function syncFromHash() {
   cancelTransition();
   preview = null;
-  tileView.hidden = true;
-  tileView.classList.remove('is-active');
-  tileView.setAttribute('aria-hidden', 'true');
+  if (tileView) {
+    tileView.hidden = true;
+    tileView.classList.remove('is-active');
+    tileView.setAttribute('aria-hidden', 'true');
+  }
   const index = chapters.findIndex((chapter) => `#${chapter.id}` === location.hash);
   stashPoint = null;
   stashSide = 0;
