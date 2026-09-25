@@ -197,7 +197,8 @@ main.is-dragging { -webkit-user-select: none; }
 }
 body[data-view="top"] .hero { pointer-events: auto; }
 .chapter { z-index: 2; will-change: transform; }
-.card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translateX(var(--bundle-x, 0px)) rotate(var(--bundle-rot, 0deg)); transform-origin: 50% 55%; will-change: transform; }
+.card-stack { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translate(var(--bundle-x, 0px), var(--bundle-y, 0px)) rotate(var(--bundle-rot, 0deg)); transform-origin: 50% 55%; will-change: transform; }
+.card-stack.is-held { transform: translate(var(--bundle-x, 0px), calc(var(--bundle-y, 0px) - 16px)) rotate(var(--bundle-rot, 0deg)) scale(1.012); }
 .card-stack.is-morph-source { opacity: 0; }
 .chapter { z-index: var(--stack-level, 1); }
 .chapter.is-active, .chapter.is-stacked, .chapter.is-preview, .chapter.is-leaving { visibility: visible; }
@@ -212,7 +213,7 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .chapter.is-stacked .story-card,
 .chapter.is-preview .story-card,
 .rising-slot .story-card {
-  transform: translate(var(--rest-x, 0px), calc(var(--rest-y, 0px) + var(--drag-y, 0px))) rotate(var(--rest-angle, 0deg));
+  transform: translate(calc(var(--rest-x, 0px) + var(--drag-x, 0px)), calc(var(--rest-y, 0px) + var(--drag-y, 0px))) rotate(var(--rest-angle, 0deg));
 }
 .chapter.is-sheet { padding: max(32px, env(safe-area-inset-top)) 28px max(32px, env(safe-area-inset-bottom)); }
 .story-card.sheet { width: min(680px, 100%); height: auto; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
