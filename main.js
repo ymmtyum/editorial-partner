@@ -406,7 +406,7 @@ function releasePose(velocity = poseVelocity()) {
     const vx = pose.x || velocity.x;
     const vy = pose.y || velocity.y;
     const len = Math.hypot(vx, vy) || 1;
-    const fly = bundleDistance();
+    const fly = Math.hypot(deck.clientWidth, deck.clientHeight) * 0.85;
     springPose(vx / len * fly, vy / len * fly, velocity, commitPeel);
     return;
   }
@@ -1146,13 +1146,25 @@ window.addEventListener('wheel', (event) => {
   applyPose();
 }, { passive: false, capture: true });
 
+const BUNDLE_HOLD_MS = 520;
+
 function startDrag(x, y, interactive, source) {
   resetWheel(false);
   captureLivePose();
-  return {
+  const gesture = {
     originX: x, originY: y, lastY: y, baseX: pose.x, baseY: pose.y, downAt: performance.now(),
-    mode: null, source, interactive,
+    mode: null, source, interactive, holdTimer: 0,
   };
+  if (view !== 'top') {
+    gesture.holdTimer = setTimeout(() => {
+      if (gesture.mode) return;
+      gesture.mode = 'bundle';
+      movingBundle = true;
+      cardStack.classList.add('is-held');
+      applyPose();
+    }, BUNDLE_HOLD_MS);
+  }
+  return gesture;
 }
 
 function moveDrag(gesture, x, y) {
@@ -1164,8 +1176,10 @@ function moveDrag(gesture, x, y) {
   if (gesture.mode === 'boundary') {
     const continued = Math.sign(-rawY);
     if (continued && continued === gesture.boundaryDirection) {
-      gesture.mode = 'drag';
-      gesture.axis = 'y';
+      clearTimeout(gesture.holdTimer);
+      gesture.mode = 'peel';
+      movingBundle = false;
+      cardStack.classList.remove('is-held');
       gesture.originX = x;
       gesture.originY = y;
       gesture.baseX = pose.x;
@@ -1176,18 +1190,17 @@ function moveDrag(gesture, x, y) {
       gesture.originY = y;
     }
   }
-  const held = performance.now() - gesture.downAt > 220;
-  if (!gesture.mode && view !== 'top' && held && Math.hypot(rawX, rawY) < 12) {
-    gesture.mode = 'bundle';
-    movingBundle = true;
-    cardStack.classList.add('is-held');
-  }
-  if (!gesture.mode && Math.hypot(rawX, rawY) > 6) {
+  if (!gesture.mode && Math.hypot(rawX, rawY) > 8) {
+    clearTimeout(gesture.holdTimer);
     const vertical = Math.abs(rawY) > Math.abs(rawX) * 1.35;
     const readDirection = rawY < 0 ? 1 : -1;
     if (view === 'top') gesture.mode = 'bundle';
-    else if (vertical && canReadFurther(readDirection) && !held) gesture.mode = 'read';
-    else gesture.mode = held ? 'bundle' : 'peel';
+    else if (vertical && canReadFurther(readDirection)) gesture.mode = 'read';
+    else gesture.mode = 'peel';
+    if (gesture.mode === 'peel') {
+      movingBundle = false;
+      cardStack.classList.remove('is-held');
+    }
     if (gesture.mode === 'bundle') movingBundle = true;
     if (gesture.mode !== 'read') tracking = true;
   }
@@ -1217,6 +1230,7 @@ function moveDrag(gesture, x, y) {
 
 function endDrag(gesture) {
   if (!gesture) return;
+  clearTimeout(gesture.holdTimer);
   if (gesture.mode === 'peel' || gesture.mode === 'bundle' || gesture.mode === 'drag') {
     suppressClickUntil = performance.now() + 340;
     releasePose();
@@ -1246,6 +1260,7 @@ deck.addEventListener('touchend', (event) => {
   touchGesture = null;
 }, { passive: false });
 deck.addEventListener('touchcancel', () => {
+  clearTimeout(touchGesture?.holdTimer);
   if (touchGesture && touchGesture.mode !== 'read') releasePose();
   touchGesture = null;
 }, { passive: true });
@@ -1268,12 +1283,16 @@ deck.addEventListener('pointerup', (event) => {
   if (deck.hasPointerCapture(event.pointerId)) deck.releasePointerCapture(event.pointerId);
 });
 deck.addEventListener('pointercancel', () => {
-  if (pointerGesture?.mode === 'drag') releasePose();
+  clearTimeout(pointerGesture?.holdTimer);
+  if (pointerGesture && pointerGesture.mode !== 'read') releasePose();
   pointerGesture = null;
 });
 deck.addEventListener('lostpointercapture', () => {
-  if (pointerGesture?.mode === 'drag') releasePose();
+  const gesture = pointerGesture;
+  if (!gesture) return;
   pointerGesture = null;
+  clearTimeout(gesture.holdTimer);
+  if (gesture.mode === 'peel' || gesture.mode === 'bundle' || gesture.mode === 'drag') releasePose();
 });
 deck.addEventListener('contextmenu', (event) => {
   if (deck.classList.contains('is-dragging')) event.preventDefault();
