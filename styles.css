@@ -248,6 +248,25 @@ main.is-dragging .card-stack { transition: none; }
 }
 .tile-toggle span { width: 8px; height: 8px; background: var(--ink); border-radius: 1px; }
 .tile-toggle:hover { transform: scale(1.06); background: var(--accent); }
+.back-top {
+  position: fixed;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 12;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #2d342f26;
+  border-radius: 50%;
+  background: #f8f7f2e8;
+  box-shadow: 0 10px 30px -18px #2d342f80;
+  backdrop-filter: blur(10px);
+  font: 28px/1 Arial, sans-serif;
+  transform: translateX(-50%);
+}
+.back-top:hover { background: var(--accent); }
 
 .tile-view {
   position: fixed;

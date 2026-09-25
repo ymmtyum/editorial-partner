@@ -6,6 +6,7 @@ const cardStack = document.querySelector('.card-stack');
 const chapters = [...cardStack.querySelectorAll(':scope > .chapter')];
 const indexLinks = [...menu.querySelectorAll('a[href^="#"]')];
 const tileToggle = document.querySelector('.tile-toggle');
+const backTop = document.querySelector('.back-top');
 const tileView = document.getElementById('card-list');
 const tileClose = document.querySelector('.tile-close');
 const tileGrid = document.querySelector('.tile-grid');
@@ -54,7 +55,6 @@ chapters.forEach((chapter, index) => {
   chapter.style.setProperty('--stack-y', `${look.y}px`);
   chapter.style.setProperty('--stack-angle', `${look.angle}deg`);
 
-  if (chapter.classList.contains('is-sheet')) return;
   const title = chapter.querySelector('h2')?.textContent.trim() || '';
   const button = document.createElement('button');
   button.type = 'button';
@@ -120,7 +120,8 @@ function updateControls(nextView) {
   document.body.dataset.view = nextView;
   const onTop = nextView === 'top';
   menuToggle.hidden = !onTop;
-  tileToggle.hidden = nextView !== 'card' || chapters[activeIndex]?.classList.contains('is-sheet');
+  backTop.hidden = nextView !== 'card';
+  tileToggle.hidden = nextView !== 'card';
   tileToggle.setAttribute('aria-expanded', nextView === 'tiles' ? 'true' : 'false');
   hero.inert = !onTop;
   hero.toggleAttribute('aria-hidden', !onTop);
@@ -1050,6 +1051,10 @@ faqItems.forEach((item) => {
   });
 });
 
+backTop.addEventListener('click', () => {
+  resetWheel(false);
+  if (location.hash !== '#top') location.hash = '#top';
+});
 menuToggle.addEventListener('click', () => {
   resetWheel(false);
   menu.showModal();
