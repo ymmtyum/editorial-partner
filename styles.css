@@ -73,9 +73,10 @@ main { touch-action: auto; }
 .voice-person { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .voice-photo { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; object-position: center 18%; }
 .voice-person span { font-size: 11px; letter-spacing: .14em; }
-.voice blockquote { position: relative; margin: 36px 0 0; padding: 18px 20px 4px; background: #eef0e6; border-radius: 18px; }
+.voice blockquote { position: relative; margin: 36px 0 0; padding: 18px 20px; background: #eef0e6; border-radius: 18px; }
 .voice blockquote::before { content: ""; position: absolute; top: 22px; left: -7px; width: 16px; height: 16px; background: #eef0e6; transform: rotate(45deg); }
 .voice blockquote p { margin: 0 0 14px; }
+.voice blockquote p:last-child { margin-bottom: 0; }
 .text-large { margin-bottom: clamp(28px, 5vh, 52px) !important; font: 600 clamp(27px, 4vw, 50px)/1.55 var(--font-display); letter-spacing: .04em; color: var(--ink); }
 .text-small { font-size: 12px; line-height: 1.9; color: var(--muted); }
 .statement-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); }
