@@ -161,7 +161,8 @@ function renderStack(index) {
   });
 }
 
-function cancelTransition() {
+function cancelAllAnimations() {
+  stopSpring();
   clearTimeout(transitionTimer);
   runningAnimations.forEach((animation) => animation.cancel());
   runningAnimations = [];
@@ -170,6 +171,10 @@ function cancelTransition() {
   tileGrid?.querySelectorAll('.is-morphing').forEach((button) => button.classList.remove('is-morphing'));
   transitionVersion += 1;
   transitioning = false;
+}
+
+function cancelTransition() {
+  cancelAllAnimations();
 }
 
 function playTransition(animations, duration, finish) {
@@ -318,13 +323,10 @@ function applyPose() {
 function stopSpring() {
   if (springFrame) cancelAnimationFrame(springFrame);
   springFrame = 0;
-  transitionVersion += 1;
-  transitioning = false;
 }
 
 function captureLivePose() {
-  if (springFrame) stopSpring();
-  else if (runningAnimations.length) {
+  if (springFrame || runningAnimations.length) {
     const stack = new DOMMatrix(getComputedStyle(cardStack).transform);
     pose.x = stack.m41;
     if (activeIndex >= 0) {
@@ -333,7 +335,7 @@ function captureLivePose() {
       const restY = isNeat(activeIndex) ? 0 : lookFor(activeIndex).y;
       pose.y = matrix.m42 - restY;
     }
-    cancelTransition();
+    cancelAllAnimations();
     chapters.forEach((_, index) => cardFor(index)?.style.removeProperty('transform'));
     cardStack.style.removeProperty('transform');
   } else if (view === 'top' && stashSide && Math.abs(pose.x) < 1) {
@@ -590,7 +592,9 @@ function commitRestore() {
 }
 
 function clearPreviewInstant() {
-  stopSpring();
+  if (springFrame || runningAnimations.length) {
+    cancelAllAnimations();
+  }
   tracking = false;
   preview = null;
   if (shownNext >= 0) {
@@ -614,7 +618,7 @@ function clearPreviewInstant() {
 }
 
 function enterStack(index = 0, { animate = true, focus = true } = {}) {
-  if (springFrame) stopSpring();
+  if (springFrame || runningAnimations.length) cancelAllAnimations();
   if (index < 0 || index >= chapters.length || transitioning) return;
   clearPreviewInstant();
   activeIndex = index;
@@ -648,7 +652,7 @@ function enterStack(index = 0, { animate = true, focus = true } = {}) {
 }
 
 function addCard({ focus = true } = {}) {
-  if (springFrame) stopSpring();
+  if (springFrame || runningAnimations.length) cancelAllAnimations();
   const index = activeIndex + 1;
   if (index >= chapters.length || transitioning) return;
   const incoming = chapters[index];
@@ -686,7 +690,7 @@ function addCard({ focus = true } = {}) {
 }
 
 function removeCard({ focus = true } = {}) {
-  if (springFrame) stopSpring();
+  if (springFrame || runningAnimations.length) cancelAllAnimations();
   if (activeIndex <= 0 || transitioning) return;
   const outgoingIndex = activeIndex;
   const nextIndex = activeIndex - 1;
@@ -722,7 +726,7 @@ function removeCard({ focus = true } = {}) {
 }
 
 function stashBundle(side, { focus = true } = {}) {
-  if (springFrame) stopSpring();
+  if (springFrame || runningAnimations.length) cancelAllAnimations();
   if (view !== 'card' || activeIndex < 0 || transitioning) return;
   const direction = side || 1;
   const start = getComputedStyle(cardStack).transform;
@@ -758,7 +762,7 @@ function stashBundle(side, { focus = true } = {}) {
 }
 
 function restoreBundle({ focus = true } = {}) {
-  if (springFrame) stopSpring();
+  if (springFrame || runningAnimations.length) cancelAllAnimations();
   if (view !== 'top' || activeIndex < 0 || !stashSide || transitioning) return;
   const start = getComputedStyle(cardStack).transform;
   preview = null;
@@ -1374,7 +1378,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 function syncFromHash() {
-  cancelTransition();
+  cancelAllAnimations();
   preview = null;
   if (tileView) {
     tileView.hidden = true;

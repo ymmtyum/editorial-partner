@@ -168,13 +168,13 @@ summary:focus-visible { outline: 2px solid #4b6338; outline-offset: 5px; }
   .card-content { font-size: 13px; line-height: 1.85; }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  *, *::before, *::after { animation-duration: 0.01ms; transition-duration: 0.01ms; }
 }
 
 /* Lift the memo from the page while it follows the hand. */
 main:has(.chapter.is-active) { cursor: grab; }
 main.is-dragging { cursor: grabbing; user-select: none; }
-.story-card.is-held { box-shadow: 0 6px 10px #2d342f0a, 0 28px 52px -16px #2d342f50; }
+.story-card.is-held { box-shadow: 0 6px 10px #2d342f0a, 0 28px 52px -16px #2d342f50; transition: box-shadow .2s ease-out; }
 .story-card::before { content: ""; position: absolute; left: 1px; right: 1px; top: 0; height: 1px; background: #ffffff9c; pointer-events: none; }
 .card-meta { padding-bottom: 20px; border-bottom: 1px solid #2d342f18; }
 .card-meta-actions { display: flex; align-items: center; gap: 14px; }
@@ -229,8 +229,9 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .chapter.is-preview { pointer-events: none; }
 .chapter.is-stacked { pointer-events: none; overflow: hidden; }
 .chapter { --rest-x: var(--stack-x, 0px); --rest-y: var(--stack-y, 0px); --rest-angle: var(--stack-angle, 0deg); }
-.chapter.is-neat, .chapter.is-neat.is-preview { --rest-x: 0px; --rest-y: 0px; --rest-angle: 0deg; }
-.chapter.is-preview { --rest-x: var(--stack-x, 0px); --rest-y: var(--stack-y, 0px); --rest-angle: var(--stack-angle, 0deg); }
+.chapter.is-neat { --rest-x: 0px; --rest-y: 0px; --rest-angle: 0deg; }
+.chapter.is-neat.is-preview { --rest-x: 0px; --rest-y: 0px; --rest-angle: 0deg; }
+.chapter.is-preview:not(.is-neat) { --rest-x: var(--stack-x, 0px); --rest-y: var(--stack-y, 0px); --rest-angle: var(--stack-angle, 0deg); }
 .rising-slot { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
 .chapter.is-active .story-card,
 .chapter.is-stacked .story-card,
@@ -245,7 +246,7 @@ body[data-view="top"] .hero { pointer-events: auto; }
 .chapter.is-stacked:not(.is-sheet) .story-card { box-shadow: 0 2px 4px #2d342f12, 0 18px 38px -21px #2d342f66; }
 .chapter.is-sheet.is-active .story-card,
 .chapter.is-sheet.is-preview .story-card { box-shadow: none; }
-main.is-dragging .story-card,
+main.is-dragging .story-card { transition: box-shadow .2s ease-out; }
 main.is-dragging .card-stack { transition: none; }
 .story-card { will-change: transform; }
 .menu-toggle { transition: opacity 140ms ease-in-out, transform 140ms ease-in-out, background .3s ease-in-out; }
